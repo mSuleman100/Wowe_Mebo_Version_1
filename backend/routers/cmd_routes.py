@@ -100,8 +100,9 @@ async def post_cmd(cmd: str, device_id: str = Query(default="alpha", description
             try:
                 await ws.send_text(f"CMD:{uuid4()}:{arduino_cmd}")
             except Exception:
+                # WS is dead — unregister and let ESP32 reconnect (do NOT queue,
+                # new ESP32 code is WS-only and won't poll the queue)
                 unregister_ws(device_id=device_id)
-                enqueue_mebo(device_id=device_id, ui_cmd=cmd, arduino_cmd=arduino_cmd)
         else:
             enqueue_mebo(device_id=device_id, ui_cmd=cmd, arduino_cmd=arduino_cmd)
 

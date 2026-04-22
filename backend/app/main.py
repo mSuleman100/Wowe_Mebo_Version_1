@@ -66,14 +66,21 @@ def create_app() -> FastAPI:
     @app.websocket("/mebo/ws/{device_id}")
     async def mebo_ws_endpoint(websocket: WebSocket, device_id: str) -> None:
         """Persistent WebSocket for ESP32 MEBO command push."""
+        import logging
+        logger = logging.getLogger("uvicorn.error")
         await websocket.accept()
         register_ws(device_id=device_id, ws=websocket)
+        logger.info(f"MEBO WS connected: device={device_id}")
         try:
             while True:
                 data = await websocket.receive_text()
                 if data.startswith("ACK:"):
                     mark_ack_received(message_id=data[4:].strip())
-        except (WebSocketDisconnect, Exception):
+        except WebSocketDisconnect:
+            logger.info(f"MEBO WS disconnected: device={device_id}")
+            unregister_ws(device_id=device_id)
+        except Exception as e:
+            logger.error(f"MEBO WS error: device={device_id} error={e}")
             unregister_ws(device_id=device_id)
 
     return app
