@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mebo UI Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 40px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(10, 24, 36, 0.95);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: #27d3ff;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(235, 245, 255, 0.7);
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+
+        .ui-mockup {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .panel {
+            background: rgba(10, 24, 36, 0.85);
+            border: 1px solid rgba(70, 160, 190, 0.28);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            color: #27d3ff;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(70, 160, 190, 0.2);
+            padding-bottom: 10px;
+        }
+
+        .robot-selector {
+            background: rgba(15, 35, 52, 0.6);
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(70, 160, 190, 0.3);
+        }
+
+        .selector-label {
+            color: rgba(235, 245, 255, 0.9);
+            font-size: 12px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .selector-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .selector-btn {
+            flex: 1;
+            padding: 12px 20px;
+            background: rgba(39, 211, 255, 0.15);
+            border: 2px solid #27d3ff;
+            color: #27d3ff;
+            border-radius: 6px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .selector-btn.active {
+            background: #27d3ff;
+            color: #0b1620;
+        }
+
+        .selector-btn:hover {
+            background: rgba(39, 211, 255, 0.3);
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            color: rgba(235, 245, 255, 0.8);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-left: 5px;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        .dpad-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 15px 25px;
+            border: 2px solid;
+            border-radius: 6px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            min-width: 100px;
+        }
+
+        .btn-movement {
+            background: rgba(39, 211, 255, 0.15);
+            border-color: #27d3ff;
+            color: #27d3ff;
+        }
+
+        .btn-movement:hover {
+            background: rgba(39, 211, 255, 0.3);
+        }
+
+        .btn-stop {
+            background: rgba(255, 59, 59, 0.15);
+            border-color: #ff3b3b;
+            color: #ff3b3b;
+        }
+
+        .btn-stop:hover {
+            background: rgba(255, 59, 59, 0.3);
+        }
+
+        .btn-action {
+            background: rgba(50, 255, 183, 0.15);
+            border-color: #32ffb7;
+            color: #32ffb7;
+        }
+
+        .btn-action:hover {
+            background: rgba(50, 255, 183, 0.3);
+        }
+
+        .btn-group-horizontal {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .btn-group-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-small {
+            padding: 12px 20px;
+            min-width: 120px;
+        }
+
+        .legend {
+            background: rgba(15, 35, 52, 0.6);
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid rgba(70, 160, 190, 0.2);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(10, 24, 36, 0.5);
+            border-radius: 4px;
+        }
+
+        .legend-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .legend-text {
+            flex: 1;
+            color: rgba(235, 245, 255, 0.9);
+            font-size: 13px;
+        }
+
+        .legend-title {
+            color: #27d3ff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .legend-desc {
+            color: rgba(235, 245, 255, 0.6);
+            font-size: 11px;
+        }
+
+        .note {
+            background: rgba(255, 184, 32, 0.1);
+            border-left: 4px solid #ffb020;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+
+        .note-title {
+            color: #ffb020;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .note-text {
+            color: rgba(235, 245, 255, 0.8);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MEBO Robot Control Interface</h1>
+        <p class="subtitle">UI Visualization & Layout Design</p>
+
+        <div class="ui-mockup">
+            <!-- Left Panel: Control Interface -->
+            <div class="panel">
+                <div class="panel-title">Control Panel - Mebo Mode</div>
+
+                <!-- Robot Type Selector -->
+                <div class="robot-selector">
+                    <div class="selector-label">Robot Type</div>
+                    <div class="selector-buttons">
+                        <div class="selector-btn">WOWE</div>
+                        <div class="selector-btn active">MEBO</div>
+                    </div>
+                </div>
+
+                <!-- Movement Section -->
+                <div class="section">
+                    <div class="section-title">Movement</div>
+                    <div class="dpad">
+                        <div class="dpad-cell"></div>
+                        <div class="dpad-cell">
+                            <button class="btn btn-movement">FORWARD</button>
+                        </div>
+                        <div class="dpad-cell"></div>
+                        <div class="dpad-cell">
+                            <button class="btn btn-movement">LEFT</button>
+                        </div>
+                        <div class="dpad-cell">
+                            <button class="btn btn-stop">STOP</button>
+                        </div>
+                        <div class="dpad-cell">
+                            <button class="btn btn-movement">RIGHT</button>
+                        </div>
+                        <div class="dpad-cell"></div>
+                        <div class="dpad-cell">
+                            <button class="btn btn-movement">REVERSE</button>
+                        </div>
+                        <div class="dpad-cell"></div>
+                    </div>
+                </div>
+
+                <!-- Claw Gripper Section -->
+                <div class="section">
+                    <div class="section-title">Claw Gripper</div>
+                    <div class="btn-group-horizontal">
+                        <button class="btn btn-action btn-small">OPEN</button>
+                        <button class="btn btn-action btn-small">CLOSE</button>
+                    </div>
+                </div>
+
+                <!-- Joint Rotation Section -->
+                <div class="section">
+                    <div class="section-title">Joint Rotation</div>
+                    <div class="btn-group-horizontal">
+                        <button class="btn btn-action btn-small">CLOCKWISE</button>
+                        <button class="btn btn-action btn-small">ANTI-CLOCKWISE</button>
+                    </div>
+                </div>
+
+                <!-- Joint 1 Section -->
+                <div class="section">
+                    <div class="section-title">Joint 1 (Vertical)</div>
+                    <div class="btn-group-vertical">
+                        <button class="btn btn-action btn-small">UP</button>
+                        <button class="btn btn-action btn-small">DOWN</button>
+                    </div>
+                </div>
+
+                <!-- Joint 2 Section -->
+                <div class="section">
+                    <div class="section-title">Joint 2 (Base)</div>
+                    <div class="btn-group-vertical">
+                        <button class="btn btn-action btn-small">UP</button>
+                        <button class="btn btn-action btn-small">DOWN</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Command Legend -->
+            <div class="panel">
+                <div class="panel-title">Command Mapping</div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(39, 211, 255, 0.2); border: 2px solid #27d3ff; color: #27d3ff;">F</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Forward</div>
+                            <div class="legend-desc">Both motors forward</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(39, 211, 255, 0.2); border: 2px solid #27d3ff; color: #27d3ff;">R</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Reverse</div>
+                            <div class="legend-desc">Both motors reverse</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(255, 59, 59, 0.2); border: 2px solid #ff3b3b; color: #ff3b3b;">S</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Stop</div>
+                            <div class="legend-desc">Stop all movement</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(39, 211, 255, 0.2); border: 2px solid #27d3ff; color: #27d3ff;">L</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Rotate Left</div>
+                            <div class="legend-desc">Left motor only</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(39, 211, 255, 0.2); border: 2px solid #27d3ff; color: #27d3ff;">Z</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Rotate Right</div>
+                            <div class="legend-desc">Right motor only</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">5</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Claw Open</div>
+                            <div class="legend-desc">Gripper opens</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">6</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Claw Close</div>
+                            <div class="legend-desc">Gripper closes</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">7</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Rotate CW</div>
+                            <div class="legend-desc">Clockwise rotation</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">8</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Rotate CCW</div>
+                            <div class="legend-desc">Anti-clockwise rotation</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">9</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Joint 1 Down</div>
+                            <div class="legend-desc">Move downward</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">A</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Joint 1 Up</div>
+                            <div class="legend-desc">Move upward</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">B</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Joint 2 Up</div>
+                            <div class="legend-desc">Base joint upward</div>
+                        </div>
+                    </div>
+
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: rgba(50, 255, 183, 0.2); border: 2px solid #32ffb7; color: #32ffb7;">C</div>
+                        <div class="legend-text">
+                            <div class="legend-title">Joint 2 Down</div>
+                            <div class="legend-desc">Base joint downward</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="note">
+            <div class="note-title">Implementation Notes</div>
+            <div class="note-text">
+                <strong>Robot Type Selector:</strong> Located at the top of the control panel, allows switching between WOWE and MEBO modes. When WOWE is selected, the original Wowe control interface is displayed. When MEBO is selected, this Mebo interface is shown.<br><br>
+                <strong>Color Scheme:</strong> Movement buttons use cyan (#27d3ff), action buttons use green (#32ffb7), and stop button uses red (#ff3b3b) to match the existing tactical theme.<br><br>
+                <strong>Layout:</strong> The interface is organized into logical sections: Movement (D-pad style), Claw Gripper, Joint Rotation, Joint 1, and Joint 2. Each section is clearly labeled and grouped visually.
+            </div>
+        </div>
+    </div>
+</body>
+</html>

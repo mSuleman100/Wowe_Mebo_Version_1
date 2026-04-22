@@ -1,0 +1,25 @@
+/*
+ ==============================================================================
+  LEGACY FILE (style.css) - WOWE Frontend (Deprecated)
+
+  Author:   M. Suleman Anwar
+  Date:     2026-01-15
+
+  Purpose:
+  - Original prototype stylesheet.
+
+  Current Architecture:
+  - The active UI stylesheet is src/styles/main.css.
+  - Kept here only for reference.
+ ==============================================================================
+*/
+
+body {
+    font-family: Arial;
+    text-align: center;
+}
+
+.controls button {
+    padding: 10px;
+    margin: 5px;
+}

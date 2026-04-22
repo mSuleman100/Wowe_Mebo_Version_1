@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mebo Game Controller - Right Side Tab UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #070b10;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding: 10px;
+            background:
+                radial-gradient(1200px 700px at 50% -10%, rgba(39, 211, 255, 0.18), transparent 55%),
+                radial-gradient(900px 500px at 80% 20%, rgba(50, 255, 183, 0.10), transparent 55%),
+                linear-gradient(180deg, #0b1620, #070b10);
+        }
+
+        /* Left Side - Video Wall (Untouched) */
+        .video-wall {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .video-feed {
+            background: rgba(10, 24, 36, 0.85);
+            border: 1px solid rgba(70, 160, 190, 0.28);
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(235, 245, 255, 0.3);
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Right Side - Control Panel Container */
+        .control-panel-container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 0;
+            height: 100%;
+            min-height: 0;
+            border-radius: 6px;
+            border: 1px solid rgba(70, 160, 190, 0.18);
+            background: linear-gradient(180deg, rgba(12, 28, 41, 0.92), rgba(7, 14, 20, 0.90));
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+            overflow: hidden;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(70, 160, 190, 0.18);
+            background: linear-gradient(180deg, rgba(12, 28, 41, 0.75), rgba(8, 18, 26, 0.6));
+        }
+
+        .tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: rgba(235, 245, 255, 0.6);
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 120ms ease;
+        }
+
+        .tab:hover {
+            color: rgba(235, 245, 255, 0.92);
+            background: rgba(10, 24, 36, 0.4);
+        }
+
+        .tab--active {
+            border-color: rgba(39, 211, 255, 0.45);
+            background: rgba(10, 24, 36, 0.65);
+            color: #27d3ff;
+            box-shadow: 0 0 0 1px rgba(39, 211, 255, 0.12) inset;
+        }
+
+        /* Tab Content Area */
+        .tab-content {
+            overflow-y: auto;
+            padding: 16px;
+            height: 100%;
+        }
+
+        /* Card Style */
+        .card {
+            background: rgba(10, 24, 36, 0.85);
+            border: 1px solid rgba(70, 160, 190, 0.28);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .card__header {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(70, 160, 190, 0.18);
+            background: linear-gradient(180deg, rgba(15, 35, 52, 0.9), rgba(12, 28, 41, 0.65));
+        }
+
+        .card__title {
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-size: 12px;
+            color: #27d3ff;
+        }
+
+        .card__body {
+            padding: 16px;
+        }
+
+        /* Robot Type Selector */
+        .robot-type-selector {
+            background: rgba(15, 35, 52, 0.6);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(70, 160, 190, 0.3);
+        }
+
+        .selector-label {
+            color: rgba(235, 245, 255, 0.9);
+            font-size: 11px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .selector-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .type-btn {
+            flex: 1;
+            padding: 10px 16px;
+            background: rgba(39, 211, 255, 0.15);
+            border: 2px solid #27d3ff;
+            color: #27d3ff;
+            border-radius: 6px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .type-btn.active {
+            background: #27d3ff;
+            color: #0b1620;
+        }
+
+        .type-btn:hover:not(.active) {
+            background: rgba(39, 211, 255, 0.3);
+        }
+
+        /* Game Controller Container */
+        .game-controller {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Joystick Section */
+        .joystick-section {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: rgba(10, 24, 36, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(70, 160, 190, 0.2);
+        }
+
+        .joystick-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            flex-shrink: 0;
+        }
+
+        .joystick-base {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: rgba(39, 211, 255, 0.15);
+            border: 3px solid rgba(39, 211, 255, 0.5);
+            box-shadow:
+                0 0 30px rgba(39, 211, 255, 0.3),
+                inset 0 0 20px rgba(39, 211, 255, 0.1);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .joystick-stick {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #27d3ff, #1fa8cc);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow:
+                0 4px 15px rgba(39, 211, 255, 0.5),
+                inset 0 2px 5px rgba(255, 255, 255, 0.2);
+            position: absolute;
+            cursor: grab;
+            transition: transform 0.1s ease-out;
+        }
+
+        .joystick-stick:active {
+            cursor: grabbing;
+        }
+
+        .joystick-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #27d3ff;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        .joystick-info {
+            flex: 1;
+            color: rgba(235, 245, 255, 0.8);
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .joystick-info-title {
+            color: #27d3ff;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 12px;
+        }
+
+        /* Stop Button */
+        .stop-section {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .stop-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ff3b3b, #cc2e2e);
+            border: 4px solid rgba(255, 59, 59, 0.6);
+            box-shadow:
+                0 0 40px rgba(255, 59, 59, 0.6),
+                inset 0 4px 10px rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .stop-button:active {
+            transform: scale(0.95);
+            box-shadow:
+                0 0 20px rgba(255, 59, 59, 0.4),
+                inset 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Action Buttons Grid */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .action-group {
+            background: rgba(10, 24, 36, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(70, 160, 190, 0.2);
+            padding: 12px;
+        }
+
+        .action-group-title {
+            color: rgba(235, 245, 255, 0.8);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .action-btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-claw {
+            background: linear-gradient(135deg, rgba(255, 184, 32, 0.2), rgba(255, 149, 0, 0.2));
+            border-color: rgba(255, 184, 32, 0.6);
+            color: #ffb020;
+            box-shadow: 0 0 20px rgba(255, 184, 32, 0.3);
+        }
+
+        .btn-rotation {
+            background: linear-gradient(135deg, rgba(50, 255, 183, 0.2), rgba(40, 204, 158, 0.2));
+            border-color: rgba(50, 255, 183, 0.6);
+            color: #32ffb7;
+            box-shadow: 0 0 20px rgba(50, 255, 183, 0.3);
+        }
+
+        .btn-joint {
+            background: linear-gradient(135deg, rgba(39, 211, 255, 0.2), rgba(31, 168, 204, 0.2));
+            border-color: rgba(39, 211, 255, 0.6);
+            color: #27d3ff;
+            box-shadow: 0 0 20px rgba(39, 211, 255, 0.3);
+        }
+
+        /* Divider */
+        .divider {
+            height: 1px;
+            background: rgba(70, 160, 190, 0.18);
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Side: Video Wall (Untouched) -->
+        <div class="video-wall">
+            <div class="video-feed">CAMERA FEED 1</div>
+            <div class="video-feed">CAMERA FEED 2</div>
+            <div class="video-feed">CAMERA FEED 3</div>
+            <div class="video-feed">CAMERA FEED 4</div>
+        </div>
+
+        <!-- Right Side: Control Panel -->
+        <div class="control-panel-container">
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab tab--active">CONTROL PANEL</button>
+                <button class="tab">SCRIPT</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <div class="card">
+                    <div class="card__header">
+                        <div class="card__title">CONTROL PANEL [MEBO]</div>
+                    </div>
+                    <div class="card__body">
+                        <!-- Robot Type Selector -->
+                        <div class="robot-type-selector">
+                            <div class="selector-label">Robot Type</div>
+                            <div class="selector-buttons">
+                                <button class="type-btn">WOWE</button>
+                                <button class="type-btn active">MEBO</button>
+                            </div>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        <!-- Game Controller -->
+                        <div class="game-controller">
+                            <!-- Joystick Section -->
+                            <div class="joystick-section">
+                                <div class="joystick-container">
+                                    <div class="joystick-base">
+                                        <div class="joystick-stick" id="joystick"></div>
+                                    </div>
+                                    <div class="joystick-label">Movement</div>
+                                </div>
+                                <div class="joystick-info">
+                                    <div class="joystick-info-title">Virtual Joystick</div>
+                                    Drag to control robot movement:<br>
+                                    • Forward: Drag Up<br>
+                                    • Reverse: Drag Down<br>
+                                    • Left: Drag Left<br>
+                                    • Right: Drag Right
+                                </div>
+                            </div>
+
+                            <!-- Stop Button -->
+                            <div class="stop-section">
+                                <div class="stop-button" id="stopBtn">STOP</div>
+                            </div>
+
+                            <!-- Action Buttons Grid -->
+                            <div class="actions-grid">
+                                <!-- Claw Group -->
+                                <div class="action-group">
+                                    <div class="action-group-title">Claw Gripper</div>
+                                    <div class="action-buttons">
+                                        <button class="action-btn btn-claw">OPEN</button>
+                                        <button class="action-btn btn-claw">CLOSE</button>
+                                    </div>
+                                </div>
+
+                                <!-- Rotation Group -->
+                                <div class="action-group">
+                                    <div class="action-group-title">Rotation</div>
+                                    <div class="action-buttons">
+                                        <button class="action-btn btn-rotation">CW</button>
+                                        <button class="action-btn btn-rotation">CCW</button>
+                                    </div>
+                                </div>
+
+                                <!-- Joint 1 Group -->
+                                <div class="action-group">
+                                    <div class="action-group-title">Joint 1</div>
+                                    <div class="action-buttons">
+                                        <button class="action-btn btn-joint">UP</button>
+                                        <button class="action-btn btn-joint">DOWN</button>
+                                    </div>
+                                </div>
+
+                                <!-- Joint 2 Group -->
+                                <div class="action-group">
+                                    <div class="action-group-title">Joint 2</div>
+                                    <div class="action-buttons">
+                                        <button class="action-btn btn-joint">UP</button>
+                                        <button class="action-btn btn-joint">DOWN</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple joystick interaction demo
+        const joystick = document.getElementById('joystick');
+        const joystickBase = joystick.parentElement;
+        let isDragging = false;
+        const maxDistance = 35; // Max distance from center
+
+        joystick.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const deltaX = e.clientX - centerX;
+            const deltaY = e.clientY - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            if (distance > maxDistance) {
+                const angle = Math.atan2(deltaY, deltaX);
+                const newX = Math.cos(angle) * maxDistance;
+                const newY = Math.sin(angle) * maxDistance;
+                joystick.style.transform = `translate(${newX}px, ${newY}px)`;
+            } else {
+                joystick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                joystick.style.transform = 'translate(0, 0)';
+            }
+        });
+
+        // Touch support
+        joystick.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const touch = e.touches[0];
+
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+
+            const deltaX = touch.clientX - centerX;
+            const deltaY = touch.clientY - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+            if (distance > maxDistance) {
+                const angle = Math.atan2(deltaY, deltaX);
+                const newX = Math.cos(angle) * maxDistance;
+                const newY = Math.sin(angle) * maxDistance;
+                joystick.style.transform = `translate(${newX}px, ${newY}px)`;
+            } else {
+                joystick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            if (isDragging) {
+                isDragging = false;
+                joystick.style.transform = 'translate(0, 0)';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <!--
+      ==============================================================================
+        WOWE Tactical C2 - Frontend Entry (index.html)
+
+        Author:   M. Suleman Anwar
+        Date:     2026-01-15
+
+        Purpose:
+        - Minimal HTML shell that mounts the JavaScript app into #app
+        - Loads the tactical UI theme from src/styles/main.css
+
+        Notes:
+        - All UI rendering and event wiring happens in src/main.js -> src/app/bootstrap.js
+      ==============================================================================
+    -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WOWE Tactical C2</title>
+    <link rel="stylesheet" href="./src/styles/main.css">
+</head>
+
+<body>
+    <!-- App root: JS mounts the dashboard here -->
+    <div id="app"></div>
+
+    <!-- ESM entrypoint -->
+    <script type="module" src="./src/main.js?v=2"></script>
+</body>
+
+</html>
