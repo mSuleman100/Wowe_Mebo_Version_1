@@ -1,0 +1,130 @@
+
+
+
+/*
+    //   case 0x89: leftArmUp();      break;    // $89 - Left Arm Up
+    //   case 0x8C: leftArmDown();    break;    // $8C - Left Arm Down
+    //   case 0x8D: leftArmIn();      break;    // $8D - Left Arm In
+    //   case 0x8A: leftArmOut();     break;    // $8A - Left Arm Out
+
+
+    //   case 0x81: rightArmUp();     break;    // $81 - Right Arm Up
+    //   case 0x84: rightArmDown();   break;    // $84 - Right Arm Down
+    //   case 0x82: rightArmOut();    break;    // $82 - Right Arm Out
+    //   case 0x85: rightArmIn();     break;    // $85 - Right Arm In
+
+
+    //   case 0x8B: tiltLeft();       break;    // $8B - Tilt Left
+    //   case 0x83: tiltRight();      break;    // $83 - Tilt Right
+
+    //   case 0x80: turnRight();      break;    // $80 - Turn Right
+    //   case 0x88: turnLeft();       break;    // $88 - Turn Left
+
+    //   case 0x86: walkForward();    break;    // $86 - Walk Forward
+    //   case 0x87: walkBackward();   break;    // $87 - Walk Backward
+
+    //   case 0x8E: stopAll(); Serial.println("Action: stop"); break; // $8E - Stop All
+
+    //   case 0x90: programMode();    break;    // $90 - Master Command Program
+    //   case 0x91: programPlay();    break;    // $91 - Program Play
+    //   case 0x92: rightSensorProg();break;    // $92 - Right Sensor Program
+    //   case 0x93: leftSensorProg(); break;    // $93 - Left Sensor Program
+    //   case 0x94: sonicSensorProg();break;    // $94 - Sonic Sensor Program
+
+
+*/
+// =========================================================
+//  COMMAND TABLE - Robot Control Codes
+// =========================================================
+//
+//  FORMAT:
+//    case 0x??: <function>(); break;     // $?? - <description>
+//
+//  NOTE:
+//    - Add $08 to switch from right-side to left-side commands.
+//    - Add $20 to command bytes for GREEN shift ($A0–$BF).
+//    - Add $40 to command bytes for ORANGE shift ($C0–$DF).
+//
+// =========================================================
+
+// switch (cmd) {
+
+//   // ------------------ BASIC COMMANDS ------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+//   // ------------------ GREEN SHIFT COMMANDS ------------------
+//   case 0xA0: rightTurnStep();  break;    // $A0 - Right Turn Step
+//   case 0xA1: rightHandThump(); break;    // $A1 - Right Hand Thump
+//   case 0xA2: rightHandThrow(); break;    // $A2 - Right Hand Throw
+//   case 0xA3: sleepMode();      break;    // $A3 - Sleep
+//   case 0xA4: rightHandPickup();break;    // $A4 - Right Hand Pickup
+//   case 0xA5: leanBackward();   break;    // $A5 - Lean Backward
+//   case 0xA6: forwardStep();    break;    // $A6 - Forward Step
+//   case 0xA7: backwardStep();   break;    // $A7 - Backward Step
+//   case 0xA8: leftTurnStep();   break;    // $A8 - Left Turn Step
+//   case 0xA9: leftHandThump();  break;    // $A9 - Left Hand Thump
+//   case 0xAA: leftHandThrow();  break;    // $AA - Left Hand Throw
+//   case 0xAB: listenMode();     break;    // $AB - Listen
+//   case 0xAC: leftHandPickup(); break;    // $AC - Left Hand Pickup
+//   case 0xAD: leanForward();    break;    // $AD - Lean Forward
+//   case 0xAE: resetAll();       break;    // $AE - Reset
+//   case 0xB0: executeMain();    break;    // $B0 - Execute (Main Program)
+//   case 0xB1: wakeUp();         break;    // $B1 - Wake Up
+//   case 0xB2: execRightProg();  break;    // $B2 - Execute Right Sensor Program
+//   case 0xB3: execLeftProg();   break;    // $B3 - Execute Left Sensor Program
+//   case 0xB4: execSonicProg();  break;    // $B4 - Execute Sonic Program
+
+//   // ------------------ ORANGE SHIFT COMMANDS ------------------
+//   case 0xC0: rightStrike3();   break;    // $C0 - Right Hand Strike 3
+//   case 0xC1: rightSweep();     break;    // $C1 - Right Hand Sweep
+//   case 0xC2: burp();           break;    // $C2 - Burp
+//   case 0xC3: rightStrike2();   break;    // $C3 - Right Hand Strike 2
+//   case 0xC4: highFive();       break;    // $C4 - High Five
+//   case 0xC5: rightStrike1();   break;    // $C5 - Right Hand Strike 1
+//   case 0xC6: bulldozer();      break;    // $C6 - Bulldozer
+//   case 0xC7: oops();           break;    // $C7 - Oops (Fart)
+//   case 0xC8: leftStrike3();    break;    // $C8 - Left Hand Strike 3
+//   case 0xC9: leftSweep();      break;    // $C9 - Left Hand Sweep
+//   case 0xCA: whistle();        break;    // $CA - Whistle
+//   case 0xCB: leftStrike2();    break;    // $CB - Left Hand Strike 2
+//   case 0xCC: talkback();       break;    // $CC - Talkback
+//   case 0xCD: leftStrike1();    break;    // $CD - Left Hand Strike 1
+//   case 0xCE: roar();           break;    // $CE - Roar
+//   case 0xD0: allDemo();        break;    // $D0 - All Demo
+//   case 0xD1: powerOff();       break;    // $D1 - Power Off ("Rosebud")
+//   case 0xD2: demo1();          break;    // $D2 - Demo 1 (Karate Skits)
+//   case 0xD3: demo2();          break;    // $D3 - Demo 2 (Rude Skits)
+//   case 0xD4: dance();          break;    // $D4 - Dance
+
+//   // ------------------ SECRET / UNDOCUMENTED CODES ------------------
+//   case 0x97: executeMain();    break;    // $97 - Same as $B0 (Execute)
+//   case 0x98: quietExecute();   break;    // $98 - Execute w/o "uh-huh"
+//   case 0x9A: silentExecuteSR();break;    // $9A - Quiet Execute (with subroutines)
+//   case 0xF6: feetShuffle();    break;    // $F6 - Feet Shuffle
+//   case 0xFB: noOp();           break;    // $FB - No Operation
+//   case 0xFC: armThrow();       break;    // $FC - Raise Arm Throw
+//   case 0xD6: karateChop();     break;    // $D6 - Karate Chop
+
+//   // ------------------ DUPLICATES / UNKNOWN ------------------
+//   // $95,$96,$99,$9B-$9F,$B5,$B6,$E0-$EE,$F0-$FA,$FD-$FF
+//   // appear to repeat main program or are non-functional.
+
+//   default:
+//     Serial.println("Unknown command");
+//     break;
+// }
+
+// =========================================================
+// END COMMAND TABLE
+// =========================================================
