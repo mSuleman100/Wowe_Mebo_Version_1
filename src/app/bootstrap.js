@@ -25,6 +25,11 @@ import { load_sequence_steps, render_sequence_editor, render_sequence_list, save
 // import { load_queues, load_execution_mode, render_queue_manager, render_queue_list, save_queues, save_execution_mode } from "../components/queue_manager.js";
 import { load_script_text, render_script_manager, save_script_text } from "../components/script_manager.js";
 import { render_video_wall } from "../components/video_wall.js";
+import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js";
+import { load_ai_mode_config, save_ai_mode_config, render_ai_mode_card } from "../components/ai_mode_panel.js";
+import { clear_ai_logs } from "../components/ai_logs_panel.js";
+import { claude } from "../utils/claude.js";
+import { start_ai_mode, stop_ai_mode, is_ai_mode_running, get_ai_instance_info } from "./ai_mode_engine.js";
 import { el, mount, qs, qsa } from "../utils/dom.js";
 import { setup_joystick, setup_vertical_slider, setup_horizontal_slider } from "../utils/joystick.js";
 
@@ -377,6 +382,243 @@ const bind_server_settings = ({ server_origin_ref, on_change }) => {
  *  - Switches between WOWE and MEBO UI
  * ==============================================================================
  */
+/**
+ * ==============================================================================
+ *  bind_ai_mode_panel()
+ *
+ *  Purpose:
+ *  - Wire AI MODE tab button handlers (START / STOP)
+ *  - Manage AI mode background loop
+ *  - Get robot status for AI decision making
+ * ==============================================================================
+ */
+const bind_ai_mode_panel = ({ server_origin_ref, robot_ref }) => {
+  const type_wowe_btn = document.getElementById("ai-type-wowe");
+  const type_mebo_btn = document.getElementById("ai-type-mebo");
+  const robot_select = document.getElementById("ai-robot-select");
+  const prompt_textarea = document.getElementById("ai-system-prompt");
+  const interval_input = document.getElementById("ai-loop-interval");
+  const start_btn = document.getElementById("ai-start-btn");
+  const stop_btn = document.getElementById("ai-stop-btn");
+  const status = document.getElementById("ai-mode-status");
+  const clear_logs_btn = document.getElementById("ai-clear-logs-btn");
+
+  if (!robot_select || !prompt_textarea || !start_btn || !stop_btn || !status) return;
+
+  let selected_robot_type = load_ai_mode_config().robot_type;
+
+  // Wire robot type selection
+  if (type_wowe_btn && type_mebo_btn) {
+    const update_type_buttons = (type) => {
+      type_wowe_btn.classList.toggle("active", type === "wowe");
+      type_mebo_btn.classList.toggle("active", type === "mebo");
+    };
+
+    type_wowe_btn.addEventListener("click", () => {
+      selected_robot_type = "wowe";
+      update_type_buttons("wowe");
+    });
+
+    type_mebo_btn.addEventListener("click", () => {
+      selected_robot_type = "mebo";
+      update_type_buttons("mebo");
+    });
+
+    update_type_buttons(selected_robot_type);
+  }
+
+  // Wire clear logs button
+  if (clear_logs_btn) {
+    clear_logs_btn.addEventListener("click", () => {
+      clear_ai_logs();
+      const logs_list = document.getElementById("ai-logs-list");
+      if (logs_list) {
+        logs_list.replaceChildren();
+        logs_list.append(
+          el({
+            tag: "div",
+            class_name: "ai-logs__empty",
+            text: "No AI activity yet. Start AI mode to see logs.",
+          })
+        );
+      }
+    });
+  }
+
+  // Get current robot status for AI
+  const get_robot_status = async (robot_id) => {
+    // TODO: Integrate with actual robot API to get status
+    // For now, return placeholder status
+    return {
+      robot_id,
+      position: { x: 0, y: 0 },
+      battery: 85,
+      status: "idle",
+      timestamp: new Date().toISOString(),
+    };
+  };
+
+  const update_status = (message, is_running) => {
+    status.textContent = message;
+    status.className = `ai-mode__status ${
+      is_running ? "ai-mode__status--running" : "ai-mode__status--stopped"
+    }`;
+  };
+
+  const on_ai_status_change = (info) => {
+    const { status: state, robot_id, error, command } = info;
+
+    if (state === "started") {
+      update_status(`✓ AI MODE ACTIVE (${robot_id})`, true);
+    } else if (state === "stopped") {
+      update_status(`⊙ AI MODE STOPPED (${robot_id})`, false);
+    } else if (state === "decision_executed") {
+      update_status(`⟳ DECISION: ${command} (${robot_id})`, true);
+    } else if (state === "error") {
+      update_status(`✗ ERROR: ${error}`, true);
+    }
+  };
+
+  start_btn.addEventListener("click", () => {
+    const robot_id = robot_select.value.trim().toLowerCase();
+    const system_prompt = prompt_textarea.value.trim();
+    const interval_seconds = parseInt(interval_input.value) || 3;
+
+    if (!system_prompt) {
+      update_status("✗ System prompt required", false);
+      return;
+    }
+
+    if (!robot_id) {
+      update_status("✗ Select target robot", false);
+      return;
+    }
+
+    // Save config
+    save_ai_mode_config({
+      robot_type: selected_robot_type,
+      robot_id,
+      system_prompt,
+      loop_interval_seconds: interval_seconds,
+      is_active: true,
+    });
+
+    // Start AI mode
+    try {
+      start_ai_mode({
+        robot_type: selected_robot_type,
+        robot_id,
+        system_prompt,
+        loop_interval_seconds: interval_seconds,
+        server_origin: server_origin_ref.get(),
+        get_robot_status,
+        on_status_change: on_ai_status_change,
+      });
+
+      update_status(`✓ AI MODE ACTIVE (${robot_id})`, true);
+    } catch (error) {
+      update_status(`✗ Failed to start: ${error.message}`, false);
+    }
+  });
+
+  stop_btn.addEventListener("click", () => {
+    const robot_id = robot_select.value.trim().toLowerCase();
+
+    stop_ai_mode(robot_id);
+
+    save_ai_mode_config({
+      robot_type: selected_robot_type,
+      robot_id,
+      system_prompt: prompt_textarea.value.trim(),
+      loop_interval_seconds: parseInt(interval_input.value) || 3,
+      is_active: false,
+    });
+
+    update_status(`⊙ AI MODE STOPPED (${robot_id})`, false);
+  });
+
+  // Load saved config
+  const config = load_ai_mode_config();
+  robot_select.value = config.robot_id;
+  prompt_textarea.value = config.system_prompt;
+  interval_input.value = config.loop_interval_seconds;
+
+  // Show status if AI was running
+  if (config.is_active && is_ai_mode_running(config.robot_id)) {
+    const info = get_ai_instance_info(config.robot_id);
+    if (info) {
+      update_status(
+        `✓ AI MODE ACTIVE (${info.decision_count} decisions)`,
+        true
+      );
+    }
+  }
+};
+
+/**
+ * ==============================================================================
+ *  bind_config_panel()
+ *
+ *  Purpose:
+ *  - Wire CONFIG tab button handlers (SAVE KEY / CLEAR KEY)
+ *  - Update status message on save/clear
+ * ==============================================================================
+ */
+const bind_config_panel = () => {
+  const api_key_input = document.getElementById("claude-api-key");
+  const model_select = document.getElementById("claude-model-select");
+  const save_btn = document.getElementById("save-claude-api-key");
+  const clear_btn = document.getElementById("clear-claude-api-key");
+  const status = document.getElementById("config-status");
+
+  if (!api_key_input || !save_btn || !clear_btn || !status) return;
+
+  api_key_input.value = load_claude_api_key();
+
+  const update_status = (message, is_success) => {
+    status.textContent = message;
+    status.className = `config__status ${is_success ? "config__status--success" : "config__status--error"}`;
+  };
+
+  const clear_status = () => {
+    status.textContent = "";
+    status.className = "config__status";
+  };
+
+  save_btn.addEventListener("click", () => {
+    const api_key = api_key_input.value.trim();
+    if (!api_key) {
+      update_status("API key cannot be empty", false);
+      return;
+    }
+    if (save_claude_api_key(api_key)) {
+      update_status("✓ API Key Saved", true);
+      setTimeout(clear_status, 3000);
+    } else {
+      update_status("Failed to save API key", false);
+    }
+  });
+
+  clear_btn.addEventListener("click", () => {
+    clear_claude_api_key();
+    api_key_input.value = "";
+    update_status("✓ API Key Cleared", true);
+    setTimeout(clear_status, 3000);
+  });
+
+  if (model_select) {
+    model_select.addEventListener("change", () => {
+      const selected_model = model_select.value;
+      if (save_claude_model(selected_model)) {
+        update_status("✓ Model Changed", true);
+        setTimeout(clear_status, 3000);
+      } else {
+        update_status("Failed to change model", false);
+      }
+    });
+  }
+};
+
 const bind_robot_type_selector = ({ robot_type_ref, save_robot_type, switch_right_tab }) => {
   const woweBtn = document.getElementById("robot-type-wowe");
   const meboBtn = document.getElementById("robot-type-mebo");
@@ -1079,8 +1321,42 @@ export const bootstrap_app = ({ root_element_id }) => {
         // UI is re-rendered on each tab switch, so bind each time
         bind_script_manager({ server_origin_ref });
       }
+    } else if (tab_name === "config") {
+      tab_content.replaceChildren(render_config_card());
+      // Hide sequence editor
+      const seq_list = document.getElementById("seq-list");
+      if (seq_list) {
+        const seq_editor = seq_list.closest(".card");
+        if (seq_editor) {
+          seq_editor.style.display = "none";
+        }
+      }
+      // Bind config handlers
+      bind_config_panel();
+    } else if (tab_name === "ai-mode") {
+      tab_content.replaceChildren(render_ai_mode_card());
+      // Hide sequence editor
+      const seq_list = document.getElementById("seq-list");
+      if (seq_list) {
+        const seq_editor = seq_list.closest(".card");
+        if (seq_editor) {
+          seq_editor.style.display = "none";
+        }
+      }
+      // Bind AI mode handlers
+      bind_ai_mode_panel({ server_origin_ref, robot_ref });
     }
   };
+
+  // Initialize Claude API utility (available globally + in window)
+  window.claude_api = claude;
+  console.log(
+    `Claude API initialized. ${
+      claude.is_configured()
+        ? "✓ API key configured"
+        : "⚠ No API key set (configure in CONFIG panel)"
+    }`
+  );
 
   // Initial render based on robot type
   switch_right_tab("control");
