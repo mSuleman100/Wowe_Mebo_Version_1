@@ -215,11 +215,11 @@ export const render_config_card = () => {
 
   const header = el({ tag: "header", class_name: "card__header" });
   header.append(
-    el({ tag: "div", class_name: "card__title", text: "CONFIG" }),
+    el({ tag: "div", class_name: "card__title", text: "CLAUDE SETTINGS" }),
     el({
       tag: "div",
       class_name: "card__subtitle",
-      text: "SETTINGS",
+      text: "API CONFIGURATION",
     })
   );
 

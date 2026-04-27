@@ -295,12 +295,6 @@ export const render_control_panel = () => {
     el({
       tag: "button",
       class_name: "tab",
-      attrs: { id: "tab-config", type: "button", "data-tab": "config" },
-      text: "CONFIG",
-    }),
-    el({
-      tag: "button",
-      class_name: "tab",
       attrs: { id: "tab-ai-mode", type: "button", "data-tab": "ai-mode" },
       text: "AI MODE",
     })

@@ -18,14 +18,14 @@
 import { check_health, get_mjpeg_stream_url, get_server_origin, send_cmd, send_halt, send_script, send_sequence, set_server_origin } from "../api/robot_api.js";
 import { COMMANDS, FEEDS, EXECUTION_MODES, ROBOTS, ROBOT_TYPES, ROBOT_TYPE_STORAGE_KEY, MEBO_COMMANDS } from "./constants.js";
 import { parse_simple_json_script } from "./script_engine.js";
-import { render_app_shell } from "../components/app_shell.js";
-import { render_control_panel, render_control_panel_content } from "../components/control_panel.js";
+import { render_app_shell } from "../components/app_shell.js?v=sidebar7";
+import { render_control_panel, render_control_panel_content } from "../components/control_panel.js?v=cp2";
 import { render_mebo_control_panel_content } from "../components/mebo_control_panel.js";
 import { load_sequence_steps, render_sequence_editor, render_sequence_list, save_sequence_steps } from "../components/sequence_editor.js";
 // import { load_queues, load_execution_mode, render_queue_manager, render_queue_list, save_queues, save_execution_mode } from "../components/queue_manager.js";
 import { load_script_text, render_script_manager, save_script_text } from "../components/script_manager.js";
 import { render_video_wall } from "../components/video_wall.js";
-import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js";
+import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js?v=settings3";
 import { load_ai_mode_config, save_ai_mode_config, render_ai_mode_card } from "../components/ai_mode_panel.js";
 import { clear_ai_logs } from "../components/ai_logs_panel.js";
 import { claude } from "../utils/claude.js";
@@ -619,6 +619,94 @@ const bind_config_panel = () => {
   }
 };
 
+const render_robot_management_panel = () => {
+  const wrap = el({ tag: "section", class_name: "settings__panel" });
+  const form = el({ tag: "div", class_name: "settings__robot-form" });
+  const actions = el({ tag: "div", class_name: "settings__robot-actions" });
+
+  form.append(
+    el({ tag: "label", class_name: "label", attrs: { for: "settings-robot-name" }, text: "Robot Name" }),
+    el({ tag: "input", class_name: "input", attrs: { id: "settings-robot-name", placeholder: "BRAVO-2", autocomplete: "off" } }),
+    el({ tag: "label", class_name: "label", attrs: { for: "settings-robot-type" }, text: "Robot Type" }),
+    el({ tag: "select", class_name: "input", attrs: { id: "settings-robot-type" } }),
+    el({ tag: "label", class_name: "label", attrs: { for: "settings-robot-feed" }, text: "Feed / Device Id" }),
+    el({ tag: "input", class_name: "input", attrs: { id: "settings-robot-feed", placeholder: "alpha", autocomplete: "off" } })
+  );
+
+  actions.append(
+    el({ tag: "button", class_name: "btn btn--primary", attrs: { id: "settings-add-robot", type: "button" }, text: "Add + Broadcast" }),
+    el({ tag: "button", class_name: "btn btn--ghost", attrs: { id: "settings-clear-robot", type: "button" }, text: "Clear Form" })
+  );
+
+  wrap.append(
+    el({ tag: "div", class_name: "settings__title", text: "ROBOT MANAGEMENT" }),
+    el({
+      tag: "div",
+      class_name: "settings__subtitle",
+      text: "Register robot identity and bind it to an ingest feed before operations.",
+    }),
+    el({ tag: "div", class_name: "settings__robot-badge", text: `Provisioned Slots: ${ROBOTS.length}` }),
+    form,
+    actions,
+    el({
+      tag: "div",
+      class_name: "settings__robot-note",
+      text: "Tip: use unique names and keep feed/device id aligned with backend routes.",
+    })
+  );
+
+  const type_select = wrap.querySelector("#settings-robot-type");
+  if (type_select) {
+    type_select.append(
+      el({ tag: "option", attrs: { value: "wowe" }, text: "WOWE" }),
+      el({ tag: "option", attrs: { value: "mebo" }, text: "MEBO" })
+    );
+  }
+
+  const clear_btn = wrap.querySelector("#settings-clear-robot");
+  const name_input = wrap.querySelector("#settings-robot-name");
+  const feed_input = wrap.querySelector("#settings-robot-feed");
+  if (clear_btn && name_input && feed_input && type_select) {
+    clear_btn.addEventListener("click", () => {
+      name_input.value = "";
+      feed_input.value = "";
+      type_select.value = "wowe";
+    });
+  }
+
+  return wrap;
+};
+
+const render_settings_overview_panel = () => {
+  const wrap = el({ tag: "section", class_name: "settings__panel settings__panel--full" });
+  const list = el({ tag: "div", class_name: "settings__robot-list" });
+
+  for (const robot of ROBOTS) {
+    const row = el({ tag: "div", class_name: "settings__robot-row" });
+    row.append(
+      el({ tag: "span", class_name: "settings__robot-name", text: robot.label }),
+      el({
+        tag: "span",
+        class_name: "settings__robot-meta",
+        text: `ID: ${robot.id.toUpperCase()} • Feed: ${robot.id}`,
+      })
+    );
+    list.append(row);
+  }
+
+  wrap.append(
+    el({ tag: "div", class_name: "settings__title", text: "DEPLOYMENT OVERVIEW" }),
+    el({
+      tag: "div",
+      class_name: "settings__subtitle",
+      text: "Use this page to manage Claude configuration and robot registration. Operational control remains on Dashboard.",
+    }),
+    list
+  );
+
+  return wrap;
+};
+
 const bind_robot_type_selector = ({ robot_type_ref, save_robot_type, switch_right_tab }) => {
   const woweBtn = document.getElementById("robot-type-wowe");
   const meboBtn = document.getElementById("robot-type-mebo");
@@ -1157,6 +1245,12 @@ export const bootstrap_app = ({ root_element_id }) => {
 
   const left = qs({ selector: "#left" });
   const right = qs({ selector: "#right" });
+  const dashboard_layout = qs({ selector: "#dashboard-layout" });
+  const settings_view = qs({ selector: "#settings-view" });
+  const nav_dashboard = qs({ selector: "#nav-dashboard" });
+  const nav_settings = qs({ selector: "#nav-settings" });
+  const bottombar = qs({ selector: ".bottombar" });
+  const app_shell = qs({ selector: ".c2" });
   if (!left || !right) return;
 
   // Initialize shared state
@@ -1190,6 +1284,8 @@ export const bootstrap_app = ({ root_element_id }) => {
   // Initial render: Dashboard view
   left.append(render_video_wall({ feeds: FEEDS }));
   const control_panel = render_control_panel();
+  const legacy_config_tab = control_panel.querySelector("#tab-config");
+  if (legacy_config_tab) legacy_config_tab.remove();
   right.append(control_panel, render_sequence_editor());
 
   // Tab switching (on right side control panel)
@@ -1321,18 +1417,6 @@ export const bootstrap_app = ({ root_element_id }) => {
         // UI is re-rendered on each tab switch, so bind each time
         bind_script_manager({ server_origin_ref });
       }
-    } else if (tab_name === "config") {
-      tab_content.replaceChildren(render_config_card());
-      // Hide sequence editor
-      const seq_list = document.getElementById("seq-list");
-      if (seq_list) {
-        const seq_editor = seq_list.closest(".card");
-        if (seq_editor) {
-          seq_editor.style.display = "none";
-        }
-      }
-      // Bind config handlers
-      bind_config_panel();
     } else if (tab_name === "ai-mode") {
       tab_content.replaceChildren(render_ai_mode_card());
       // Hide sequence editor
@@ -1348,18 +1432,45 @@ export const bootstrap_app = ({ root_element_id }) => {
     }
   };
 
+  const render_settings_view = () => {
+    if (!settings_view) return;
+    settings_view.replaceChildren(el({ tag: "div", class_name: "settings__grid" }));
+    const grid = settings_view.querySelector(".settings__grid");
+    if (!grid) return;
+    grid.append(render_config_card(), render_robot_management_panel(), render_settings_overview_panel());
+    bind_config_panel();
+  };
+
+  const switch_main_view = (view_name) => {
+    if (!dashboard_layout || !settings_view || !nav_dashboard || !nav_settings) return;
+    const is_settings = view_name === "settings";
+    dashboard_layout.style.display = is_settings ? "none" : "";
+    settings_view.classList.toggle("settings-view--hidden", !is_settings);
+    if (bottombar) bottombar.classList.toggle("bottombar--hidden", is_settings);
+    if (app_shell) app_shell.classList.toggle("c2--settings", is_settings);
+    nav_dashboard.classList.toggle("sidebar__item--active", !is_settings);
+    nav_settings.classList.toggle("sidebar__item--active", is_settings);
+    if (is_settings) render_settings_view();
+  };
+
   // Initialize Claude API utility (available globally + in window)
   window.claude_api = claude;
   console.log(
     `Claude API initialized. ${
       claude.is_configured()
         ? "✓ API key configured"
-        : "⚠ No API key set (configure in CONFIG panel)"
+        : "⚠ No API key set (configure in Settings)"
     }`
   );
 
   // Initial render based on robot type
   switch_right_tab("control");
+  switch_main_view("dashboard");
+
+  if (nav_dashboard && nav_settings) {
+    nav_dashboard.addEventListener("click", () => switch_main_view("dashboard"));
+    nav_settings.addEventListener("click", () => switch_main_view("settings"));
+  }
 
   // Bind tabs in control panel (after a short delay to ensure DOM is ready)
   setTimeout(() => {
