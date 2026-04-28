@@ -15,7 +15,7 @@
  ==============================================================================
 */
 
-import { check_health, get_mjpeg_stream_url, get_server_origin, send_cmd, send_halt, send_script, send_sequence, set_server_origin } from "../api/robot_api.js";
+import { check_health, get_mjpeg_stream_url, get_server_origin, register_robot, send_cmd, send_halt, send_script, send_sequence, set_server_origin } from "../api/robot_api.js?v=api2";
 import { COMMANDS, FEEDS, EXECUTION_MODES, ROBOTS, ROBOT_TYPES, ROBOT_TYPE_STORAGE_KEY, MEBO_COMMANDS } from "./constants.js";
 import { parse_simple_json_script } from "./script_engine.js";
 import { render_app_shell } from "../components/app_shell.js?v=sidebar7";
@@ -97,7 +97,7 @@ const get_target_device_id = ({ robot_ref }) => {
   const sel = document.getElementById("robot-select");
   if (sel && typeof sel.value === "string") {
     const v = sel.value.trim().toLowerCase();
-    if (ROBOTS.some((r) => r.id === v)) return v;
+    if (v) return v;
   }
   return robot_ref.get();
 };
@@ -392,7 +392,7 @@ const bind_server_settings = ({ server_origin_ref, on_change }) => {
  *  - Get robot status for AI decision making
  * ==============================================================================
  */
-const bind_ai_mode_panel = ({ server_origin_ref, robot_ref }) => {
+const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_registry_ref }) => {
   const type_wowe_btn = document.getElementById("ai-type-wowe");
   const type_mebo_btn = document.getElementById("ai-type-mebo");
   const robot_select = document.getElementById("ai-robot-select");
@@ -406,6 +406,37 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref }) => {
   if (!robot_select || !prompt_textarea || !start_btn || !stop_btn || !status) return;
 
   let selected_robot_type = load_ai_mode_config().robot_type;
+  const render_ai_robot_options = ({ preferred_robot_id } = {}) => {
+    const robots = (settings_robot_registry_ref?.get?.() ?? []).filter(
+      (item) => item.type === selected_robot_type
+    );
+
+    robot_select.replaceChildren();
+    if (robots.length === 0) {
+      robot_select.append(
+        el({
+          tag: "option",
+          attrs: { value: "" },
+          text: `No ${selected_robot_type.toUpperCase()} robots in Robot Management`,
+        })
+      );
+      robot_select.value = "";
+      return;
+    }
+
+    for (const robot of robots) {
+      robot_select.append(
+        el({
+          tag: "option",
+          attrs: { value: robot.device_id },
+          text: robot.name,
+        })
+      );
+    }
+
+    const has_preferred = preferred_robot_id && robots.some((item) => item.device_id === preferred_robot_id);
+    robot_select.value = has_preferred ? preferred_robot_id : robots[0].device_id;
+  };
 
   // Wire robot type selection
   if (type_wowe_btn && type_mebo_btn) {
@@ -417,11 +448,13 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref }) => {
     type_wowe_btn.addEventListener("click", () => {
       selected_robot_type = "wowe";
       update_type_buttons("wowe");
+      render_ai_robot_options();
     });
 
     type_mebo_btn.addEventListener("click", () => {
       selected_robot_type = "mebo";
       update_type_buttons("mebo");
+      render_ai_robot_options();
     });
 
     update_type_buttons(selected_robot_type);
@@ -539,7 +572,8 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref }) => {
 
   // Load saved config
   const config = load_ai_mode_config();
-  robot_select.value = config.robot_id;
+  selected_robot_type = config.robot_type === ROBOT_TYPES.MEBO ? ROBOT_TYPES.MEBO : ROBOT_TYPES.WOWE;
+  render_ai_robot_options({ preferred_robot_id: config.robot_id });
   prompt_textarea.value = config.system_prompt;
   interval_input.value = config.loop_interval_seconds;
 
@@ -619,7 +653,42 @@ const bind_config_panel = () => {
   }
 };
 
-const render_robot_management_panel = () => {
+const SETTINGS_ROBOTS_STORAGE_KEY = "wowe.settings.robots";
+
+const load_settings_robots = () => {
+  const raw = localStorage.getItem(SETTINGS_ROBOTS_STORAGE_KEY);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+    const normalized = parsed
+      .map((item) => ({
+        name: String(item?.name ?? "").trim(),
+        device_id: String(item?.device_id ?? "").trim().toLowerCase(),
+        feed_id: String(item?.feed_id ?? item?.device_id ?? "").trim().toLowerCase(),
+        type: item?.type === ROBOT_TYPES.MEBO ? ROBOT_TYPES.MEBO : ROBOT_TYPES.WOWE,
+      }))
+      .filter((item) => item.name && item.device_id && item.feed_id);
+
+    // Migration: clear old auto-seeded defaults from earlier builds.
+    const legacy_default_ids = new Set(ROBOTS.map((r) => r.id));
+    const has_only_legacy_defaults =
+      normalized.length === ROBOTS.length &&
+      normalized.every((item) => legacy_default_ids.has(item.device_id) && item.device_id === item.feed_id);
+    if (has_only_legacy_defaults) return [];
+
+    return normalized;
+  } catch {
+    return [];
+  }
+};
+
+const save_settings_robots = (robots) => {
+  localStorage.setItem(SETTINGS_ROBOTS_STORAGE_KEY, JSON.stringify(robots));
+};
+
+const render_robot_management_panel = ({ robots_count = ROBOTS.length } = {}) => {
   const wrap = el({ tag: "section", class_name: "settings__panel" });
   const form = el({ tag: "div", class_name: "settings__robot-form" });
   const actions = el({ tag: "div", class_name: "settings__robot-actions" });
@@ -645,7 +714,12 @@ const render_robot_management_panel = () => {
       class_name: "settings__subtitle",
       text: "Register robot identity and bind it to an ingest feed before operations.",
     }),
-    el({ tag: "div", class_name: "settings__robot-badge", text: `Provisioned Slots: ${ROBOTS.length}` }),
+    el({
+      tag: "div",
+      class_name: "settings__robot-badge",
+      attrs: { id: "settings-robots-count" },
+      text: `Provisioned Slots: ${robots_count}`,
+    }),
     form,
     actions,
     el({
@@ -677,21 +751,114 @@ const render_robot_management_panel = () => {
   return wrap;
 };
 
-const render_settings_overview_panel = () => {
-  const wrap = el({ tag: "section", class_name: "settings__panel settings__panel--full" });
-  const list = el({ tag: "div", class_name: "settings__robot-list" });
+const render_settings_robot_row = (robot) => {
+  const row = el({ tag: "div", class_name: "settings__robot-row" });
+  const info = el({ tag: "div", class_name: "settings__robot-info" });
+  const remove_key = `${robot.type}:${robot.device_id}`;
+  const remove_btn = el({
+    tag: "button",
+    class_name: "settings__robot-remove",
+    attrs: {
+      type: "button",
+      "data-remove-robot": remove_key,
+      title: `Remove ${robot.name}`,
+      "aria-label": `Remove ${robot.name}`,
+    },
+    text: "✕",
+  });
+  info.append(
+    el({ tag: "span", class_name: "settings__robot-name", text: robot.name.toUpperCase() }),
+    el({
+      tag: "span",
+      class_name: "settings__robot-meta",
+      text: `Type: ${robot.type.toUpperCase()} • Device ID: ${robot.device_id.toUpperCase()} • Feed ID: ${robot.feed_id.toUpperCase()}`,
+    })
+  );
+  row.append(info, remove_btn);
+  return row;
+};
 
-  for (const robot of ROBOTS) {
-    const row = el({ tag: "div", class_name: "settings__robot-row" });
-    row.append(
-      el({ tag: "span", class_name: "settings__robot-name", text: robot.label }),
+const bind_robot_management_panel = ({ robot_registry_ref, server_origin_ref, on_change }) => {
+  const name_input = document.getElementById("settings-robot-name");
+  const type_select = document.getElementById("settings-robot-type");
+  const feed_input = document.getElementById("settings-robot-feed");
+  const add_button = document.getElementById("settings-add-robot");
+  const overview_list = document.getElementById("settings-robot-overview-list");
+  const robots_count = document.getElementById("settings-robots-count");
+  if (!name_input || !type_select || !feed_input || !add_button) return;
+
+  add_button.addEventListener("click", async () => {
+    const name = name_input.value.trim();
+    const device_id = feed_input.value.trim().toLowerCase();
+    const type = type_select.value === ROBOT_TYPES.MEBO ? ROBOT_TYPES.MEBO : ROBOT_TYPES.WOWE;
+    if (!name || !device_id) return;
+
+    const next_robot = {
+      name,
+      device_id,
+      feed_id: device_id,
+      type,
+    };
+
+    const existing = robot_registry_ref.get();
+    const without_same_device = existing.filter(
+      (item) => !(item.device_id === device_id && item.type === type)
+    );
+    const updated = [...without_same_device, next_robot];
+    robot_registry_ref.set(updated);
+    save_settings_robots(updated);
+    if (robots_count) robots_count.textContent = `Provisioned Slots: ${updated.length}`;
+    if (overview_list) {
+      overview_list.replaceChildren(...updated.map((item) => render_settings_robot_row(item)));
+    }
+
+    const registration = await register_robot({
+      name,
+      type,
+      device_id,
+      feed_id: device_id,
+      server_origin: server_origin_ref?.get?.(),
+    });
+    if (!registration.is_ok) {
+      console.warn("Backend robot registration failed:", registration.error);
+    }
+
+    on_change?.();
+  });
+
+  if (overview_list) {
+    overview_list.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const remove_key = target.getAttribute("data-remove-robot");
+      if (!remove_key) return;
+      const [remove_type, remove_device_id] = remove_key.split(":");
+      if (!remove_type || !remove_device_id) return;
+
+      const updated = robot_registry_ref
+        .get()
+        .filter((item) => !(item.device_id === remove_device_id && item.type === remove_type));
+      robot_registry_ref.set(updated);
+      save_settings_robots(updated);
+      on_change?.();
+    });
+  }
+};
+
+const render_settings_overview_panel = ({ robots = [] } = {}) => {
+  const wrap = el({ tag: "section", class_name: "settings__panel settings__panel--full" });
+  const list = el({ tag: "div", class_name: "settings__robot-list", attrs: { id: "settings-robot-overview-list" } });
+
+  if (robots.length === 0) {
+    list.append(
       el({
-        tag: "span",
-        class_name: "settings__robot-meta",
-        text: `ID: ${robot.id.toUpperCase()} • Feed: ${robot.id}`,
+        tag: "div",
+        class_name: "settings__robot-row",
+        text: "No robots added yet. Use Robot Management to add WOWE/MEBO robots.",
       })
     );
-    list.append(row);
+  } else {
+    for (const robot of robots) list.append(render_settings_robot_row(robot));
   }
 
   wrap.append(
@@ -748,23 +915,59 @@ const bind_robot_type_selector = ({ robot_type_ref, save_robot_type, switch_righ
  *  - Wire robot selection dropdown (shared by WOWE and MEBO)
  * ==============================================================================
  */
-const bind_robot_selector = ({ robot_ref }) => {
+const bind_robot_selector = ({ robot_ref, robot_type_ref, settings_robot_registry_ref }) => {
   const select = document.getElementById("robot-select");
   if (!select) return;
 
-  // Set initial value
-  select.value = robot_ref.get();
+  const selected_type = robot_type_ref?.get?.() ?? ROBOT_TYPES.WOWE;
+  const settings_robots = (settings_robot_registry_ref?.get?.() ?? []).filter(
+    (robot) => robot.type === selected_type
+  );
+  const mapped_robots = settings_robots.map((robot) => ({
+    id: robot.device_id,
+    label: robot.name,
+  }));
+
+  select.replaceChildren();
+  if (mapped_robots.length === 0) {
+    select.append(
+      el({
+        tag: "option",
+        attrs: { value: "" },
+        text: `No ${selected_type.toUpperCase()} robots configured`,
+      })
+    );
+    select.value = "";
+    return;
+  }
+
+  mapped_robots.forEach((robot) => {
+    select.append(
+      el({
+        tag: "option",
+        attrs: { value: robot.id },
+        text: robot.label,
+      })
+    );
+  });
+
+  const current = robot_ref.get();
+  const has_current = mapped_robots.some((robot) => robot.id === current);
+  const next_robot_id = has_current ? current : mapped_robots[0].id;
+  select.value = next_robot_id;
+  robot_ref.set(next_robot_id);
+  localStorage.setItem("wowe.selected_robot", next_robot_id);
 
   select.addEventListener("change", () => {
     const selected = select.value;
-    if (ROBOTS.some(r => r.id === selected)) {
+    if (mapped_robots.some((r) => r.id === selected)) {
       robot_ref.set(selected);
       localStorage.setItem("wowe.selected_robot", selected);
 
       // Update subtitle if it exists
       const subtitle = document.querySelector(".card__subtitle");
       if (subtitle) {
-        const robot_label = ROBOTS.find(r => r.id === selected)?.label || selected.toUpperCase();
+        const robot_label = mapped_robots.find((r) => r.id === selected)?.label || selected.toUpperCase();
         subtitle.textContent = `[${robot_label}]`;
       }
     }
@@ -1275,6 +1478,7 @@ export const bootstrap_app = ({ root_element_id }) => {
     robot_type_ref.set(type);
     localStorage.setItem(ROBOT_TYPE_STORAGE_KEY, type);
   };
+  const settings_robot_registry_ref = create_ref(load_settings_robots());
 
   // Queue manager state (will be initialized when queue tab is opened)
   // let queue_state_ref = null;
@@ -1327,7 +1531,7 @@ export const bootstrap_app = ({ root_element_id }) => {
           },
         });
         bind_robot_type_selector({ robot_type_ref, save_robot_type, switch_right_tab });
-        bind_robot_selector({ robot_ref });
+        bind_robot_selector({ robot_ref, robot_type_ref, settings_robot_registry_ref });
         bind_mebo_controls({ server_origin_ref, robot_ref });
       } else {
         // Render WOWE control panel (ORIGINAL - NO CHANGES)
@@ -1356,7 +1560,7 @@ export const bootstrap_app = ({ root_element_id }) => {
           },
         });
         bind_robot_type_selector({ robot_type_ref, save_robot_type, switch_right_tab });
-        bind_robot_selector({ robot_ref });
+        bind_robot_selector({ robot_ref, robot_type_ref, settings_robot_registry_ref });
         bind_motion_buttons({ server_origin_ref, robot_ref });
         bind_keyboard_motion({ server_origin_ref, robot_ref });
         bind_actions({ server_origin_ref, robot_ref, seq_state });
@@ -1428,7 +1632,7 @@ export const bootstrap_app = ({ root_element_id }) => {
         }
       }
       // Bind AI mode handlers
-      bind_ai_mode_panel({ server_origin_ref, robot_ref });
+      bind_ai_mode_panel({ server_origin_ref, robot_ref, settings_robot_registry_ref });
     }
   };
 
@@ -1437,8 +1641,18 @@ export const bootstrap_app = ({ root_element_id }) => {
     settings_view.replaceChildren(el({ tag: "div", class_name: "settings__grid" }));
     const grid = settings_view.querySelector(".settings__grid");
     if (!grid) return;
-    grid.append(render_config_card(), render_robot_management_panel(), render_settings_overview_panel());
+    const settings_robots = settings_robot_registry_ref.get();
+    grid.append(
+      render_config_card(),
+      render_robot_management_panel({ robots_count: settings_robots.length }),
+      render_settings_overview_panel({ robots: settings_robots })
+    );
     bind_config_panel();
+    bind_robot_management_panel({
+      robot_registry_ref: settings_robot_registry_ref,
+      server_origin_ref,
+      on_change: () => render_settings_view(),
+    });
   };
 
   const switch_main_view = (view_name) => {
@@ -1451,6 +1665,7 @@ export const bootstrap_app = ({ root_element_id }) => {
     nav_dashboard.classList.toggle("sidebar__item--active", !is_settings);
     nav_settings.classList.toggle("sidebar__item--active", is_settings);
     if (is_settings) render_settings_view();
+    else switch_right_tab(current_right_tab);
   };
 
   // Initialize Claude API utility (available globally + in window)

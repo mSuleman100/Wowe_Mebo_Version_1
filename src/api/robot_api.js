@@ -239,3 +239,26 @@ export const check_health = async ({ server_origin, signal }) => {
   }
 };
 
+export const register_robot = async ({ name, type, device_id, feed_id, server_origin, signal }) => {
+  const url = build_url({ server_origin, path: "/robots/register" });
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, type, device_id, feed_id }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return { is_ok: false, error: `Robot registration failed (${response.status}): ${text}` };
+    }
+
+    const data = await response.json();
+    return { is_ok: true, data };
+  } catch (error) {
+    return { is_ok: false, error: String(error?.message ?? error) };
+  }
+};
+

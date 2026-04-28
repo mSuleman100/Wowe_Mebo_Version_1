@@ -54,3 +54,22 @@ class ScriptResponse(BaseModel):
     is_ok: bool
     message: str
 
+
+class RobotEntry(BaseModel):
+    name: str
+    type: str
+    device_id: str
+    feed_id: str
+
+
+class RobotRegistrationRequest(BaseModel):
+    name: str
+    type: str
+    device_id: str
+    feed_id: str
+
+
+class RobotRegistrationResponse(BaseModel):
+    is_ok: bool
+    robot: RobotEntry
+

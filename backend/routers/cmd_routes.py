@@ -23,6 +23,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.state.ir_queue import enqueue as enqueue_ir
 from backend.state.mebo_queue import clear_queue as clear_mebo_queue, enqueue as enqueue_mebo, get_ws, unregister_ws
+from backend.state.robot_registry import touch_device
 from backend.state.runtime_state import set_last_cmd
 from backend.types.schemas import CommandResponse
 from backend.utils.cmd_mapping import try_get_ir_code
@@ -76,6 +77,7 @@ async def post_cmd(cmd: str, device_id: str = Query(default="alpha", description
 
     # Check if it's a MEBO command
     if cmd_lower.startswith("mebo_"):
+        touch_device(device_id=device_id, robot_type="mebo")
         if cmd_lower not in _ALLOWED_MEBO_CMDS:
             raise HTTPException(status_code=400, detail=f"Unknown MEBO command: {cmd}")
 
@@ -109,6 +111,7 @@ async def post_cmd(cmd: str, device_id: str = Query(default="alpha", description
         return CommandResponse(is_ok=True, cmd=cmd)
 
     # Otherwise, treat as WOWE command
+    touch_device(device_id=device_id, robot_type="wowe")
     if cmd_lower not in _ALLOWED_WOWE_CMDS:
         raise HTTPException(status_code=400, detail=f"Unknown command: {cmd}")
 

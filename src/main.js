@@ -60,7 +60,7 @@ if (root) root.textContent = "Loading WOWE UI…";
 // has an ESM linking error (missing export, syntax error in an imported module, etc.).
 (async () => {
   try {
-    const mod = await import("./app/bootstrap.js?v=sidebar7");
+    const mod = await import("./app/bootstrap.js?v=sidebar8");
     if (!mod || typeof mod.bootstrap_app !== "function") {
       throw new Error('Module "./app/bootstrap.js" did not export bootstrap_app()');
     }

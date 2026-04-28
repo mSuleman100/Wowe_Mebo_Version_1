@@ -261,7 +261,7 @@ body {
 .workspace {
   height: 100%;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: 116px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
@@ -282,7 +282,7 @@ body {
   box-shadow:
     0 20px 46px var(--shadow),
     0 0 0 1px rgba(39, 211, 255, 0.08) inset;
-  min-width: 92px;
+  min-width: 116px;
   position: relative;
   z-index: 5;
   backdrop-filter: blur(9px);
@@ -296,8 +296,8 @@ body {
 }
 
 .sidebar__logo {
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   border-radius: 999px;
@@ -307,23 +307,23 @@ body {
 }
 
 .sidebar__icon {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 .sidebar__logo-icon {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 }
 
 .sidebar__brand {
   text-align: center;
   color: rgba(206, 230, 255, 0.86);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .sidebar__menu {
@@ -333,21 +333,21 @@ body {
 }
 
 .sidebar__item {
-  min-height: 52px;
+  min-height: 68px;
   width: 100%;
-  padding: 8px 4px;
+  padding: 10px 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 7px;
   border-radius: 10px;
   border: 1px solid rgba(39, 211, 255, 0.12);
   background: rgba(10, 24, 36, 0.34);
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   cursor: pointer;
   transition: all 140ms ease;
   line-height: 1.4;
@@ -356,12 +356,12 @@ body {
 }
 
 .sidebar__item-icon {
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 20px;
 }
 
 .sidebar__item-label {
-  font-size: 9px;
+  font-size: 10px;
   text-align: center;
   color: inherit;
   line-height: 1.2;
@@ -404,7 +404,7 @@ body {
 
 .sidebar__status {
   color: var(--accent2);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.1em;
   position: relative;
@@ -426,12 +426,12 @@ body {
 
 .sidebar__version {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .sidebar__collapse {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .settings-view {
@@ -559,11 +559,19 @@ body {
 
 .settings__robot-row {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
   padding: 10px;
   border: 1px solid var(--line2);
   border-radius: var(--radius-sm);
   background: rgba(10, 24, 36, 0.35);
+}
+
+.settings__robot-info {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .settings__robot-name {
@@ -580,6 +588,28 @@ body {
   font-size: 11px;
   letter-spacing: 0.05em;
   line-height: 1.4;
+}
+
+.settings__robot-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 59, 59, 0.35);
+  background: rgba(255, 59, 59, 0.08);
+  color: rgba(255, 170, 170, 0.92);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.settings__robot-remove:hover {
+  border-color: rgba(255, 59, 59, 0.6);
+  background: rgba(255, 59, 59, 0.16);
+  color: rgba(255, 210, 210, 0.98);
 }
 
 .layout__left,

@@ -21,6 +21,7 @@ import logging
 
 from fastapi import APIRouter
 
+from backend.state.robot_registry import list_robots
 from backend.types.schemas import TraceRequest
 
 from backend.state.frame_store import get_frame
@@ -29,6 +30,14 @@ from backend.state.runtime_state import STATE
 
 router = APIRouter(prefix="/debug", tags=["debug"])
 logger = logging.getLogger("uvicorn.error")
+
+_DEFAULT_DEVICE_IDS = ["alpha", "bravo", "charlie", "delta"]
+
+
+def _known_device_ids() -> list[str]:
+    registered = [robot["device_id"] for robot in list_robots() if robot.get("device_id")]
+    merged = sorted(set([*_DEFAULT_DEVICE_IDS, *registered]))
+    return merged
 
 
 def _dt_iso(dt: datetime | None) -> str | None:
@@ -51,7 +60,7 @@ def get_state() -> dict:
 def get_frames() -> dict:
     """Return whether each known feed has a stored frame (debug only)."""
     out: dict[str, dict] = {}
-    for feed_id in ["alpha", "bravo", "charlie", "delta"]:
+    for feed_id in _known_device_ids():
         stored = get_frame(feed_id=feed_id)
         out[feed_id] = (
             {"has_frame": True, "bytes": len(stored.jpeg_bytes), "received_at": _dt_iso(stored.received_at)}
@@ -64,7 +73,7 @@ def get_frames() -> dict:
 @router.get("/queues")
 def get_queues() -> dict:
     """Return current IR queue depths per device (debug only)."""
-    return {device_id: get_depth(device_id=device_id) for device_id in ["alpha", "bravo", "charlie", "delta"]}
+    return {device_id: get_depth(device_id=device_id) for device_id in _known_device_ids()}
 
 
 @router.post("/trace")

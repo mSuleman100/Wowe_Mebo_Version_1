@@ -21,6 +21,7 @@ from backend.routers.debug_routes import router as debug_router
 from backend.routers.health_routes import router as health_router
 from backend.routers.ir_routes import router as ir_router
 from backend.routers.mebo_routes import router as mebo_router
+from backend.routers.robot_routes import router as robot_router
 from backend.routers.script_routes import router as script_router
 from backend.routers.sequence_routes import router as sequence_router
 from backend.routers.video_routes import router as video_router
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(sequence_router)
     app.include_router(ir_router)
     app.include_router(mebo_router)
+    app.include_router(robot_router)
     app.include_router(script_router)
     app.include_router(debug_router)
 
