@@ -73,3 +73,19 @@ class RobotRegistrationResponse(BaseModel):
     is_ok: bool
     robot: RobotEntry
 
+
+class ClaudeSettingsResponse(BaseModel):
+    is_ok: bool
+    is_configured: bool
+    model: str
+    api_key_masked: str | None = None
+
+
+class ClaudeSettingsUpdateRequest(BaseModel):
+    api_key: str
+    model: str | None = None
+
+
+class ClaudeModelUpdateRequest(BaseModel):
+    model: str
+

@@ -24,6 +24,7 @@ import { render_mebo_control_panel_content } from "../components/mebo_control_pa
 import { load_sequence_steps, render_sequence_editor, render_sequence_list, save_sequence_steps } from "../components/sequence_editor.js";
 // import { load_queues, load_execution_mode, render_queue_manager, render_queue_list, save_queues, save_execution_mode } from "../components/queue_manager.js";
 import { load_script_text, render_script_manager, save_script_text } from "../components/script_manager.js";
+import { clear_claude_settings_remote, fetch_claude_settings, save_claude_settings_remote, update_claude_model_remote } from "../api/claude_settings_api.js";
 import { render_video_wall } from "../components/video_wall.js";
 import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js?v=settings3";
 import { load_ai_mode_config, save_ai_mode_config, render_ai_mode_card } from "../components/ai_mode_panel.js";
@@ -598,7 +599,7 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
  *  - Update status message on save/clear
  * ==============================================================================
  */
-const bind_config_panel = () => {
+const bind_config_panel = ({ server_origin_ref }) => {
   const api_key_input = document.getElementById("claude-api-key");
   const model_select = document.getElementById("claude-model-select");
   const save_btn = document.getElementById("save-claude-api-key");
@@ -608,6 +609,7 @@ const bind_config_panel = () => {
   if (!api_key_input || !save_btn || !clear_btn || !status) return;
 
   api_key_input.value = load_claude_api_key();
+  if (model_select) model_select.value = load_claude_model();
 
   const update_status = (message, is_success) => {
     status.textContent = message;
@@ -619,13 +621,32 @@ const bind_config_panel = () => {
     status.className = "config__status";
   };
 
-  save_btn.addEventListener("click", () => {
+  const load_remote_settings = async () => {
+    const remote = await fetch_claude_settings({ server_origin: server_origin_ref?.get?.() });
+    if (!remote.is_ok || !remote.data) return;
+    const model = remote.data.model;
+    if (model_select && model && save_claude_model(model)) model_select.value = model;
+    if (remote.data.is_configured) update_status("✓ Backend Claude settings loaded", true);
+  };
+
+  save_btn.addEventListener("click", async () => {
     const api_key = api_key_input.value.trim();
+    const selected_model = model_select?.value ?? load_claude_model();
     if (!api_key) {
       update_status("API key cannot be empty", false);
       return;
     }
+    const remote = await save_claude_settings_remote({
+      api_key,
+      model: selected_model,
+      server_origin: server_origin_ref?.get?.(),
+    });
+    if (!remote.is_ok) {
+      update_status(`Backend save failed: ${remote.error}`, false);
+      return;
+    }
     if (save_claude_api_key(api_key)) {
+      save_claude_model(selected_model);
       update_status("✓ API Key Saved", true);
       setTimeout(clear_status, 3000);
     } else {
@@ -633,7 +654,12 @@ const bind_config_panel = () => {
     }
   });
 
-  clear_btn.addEventListener("click", () => {
+  clear_btn.addEventListener("click", async () => {
+    const remote = await clear_claude_settings_remote({ server_origin: server_origin_ref?.get?.() });
+    if (!remote.is_ok) {
+      update_status(`Backend clear failed: ${remote.error}`, false);
+      return;
+    }
     clear_claude_api_key();
     api_key_input.value = "";
     update_status("✓ API Key Cleared", true);
@@ -641,8 +667,16 @@ const bind_config_panel = () => {
   });
 
   if (model_select) {
-    model_select.addEventListener("change", () => {
+    model_select.addEventListener("change", async () => {
       const selected_model = model_select.value;
+      const remote = await update_claude_model_remote({
+        model: selected_model,
+        server_origin: server_origin_ref?.get?.(),
+      });
+      if (!remote.is_ok) {
+        update_status(`Failed to change model: ${remote.error}`, false);
+        return;
+      }
       if (save_claude_model(selected_model)) {
         update_status("✓ Model Changed", true);
         setTimeout(clear_status, 3000);
@@ -651,6 +685,8 @@ const bind_config_panel = () => {
       }
     });
   }
+
+  load_remote_settings();
 };
 
 const SETTINGS_ROBOTS_STORAGE_KEY = "wowe.settings.robots";
@@ -1647,7 +1683,7 @@ export const bootstrap_app = ({ root_element_id }) => {
       render_robot_management_panel({ robots_count: settings_robots.length }),
       render_settings_overview_panel({ robots: settings_robots })
     );
-    bind_config_panel();
+    bind_config_panel({ server_origin_ref });
     bind_robot_management_panel({
       robot_registry_ref: settings_robot_registry_ref,
       server_origin_ref,

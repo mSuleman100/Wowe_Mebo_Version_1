@@ -11,7 +11,7 @@
  ==============================================================================
 */
 
-export const DEFAULT_SERVER_ORIGIN = "http://localhost:8000";
+export const DEFAULT_SERVER_ORIGIN = "http://localhost:8002";
 export const SERVER_ORIGIN_STORAGE_KEY = "wowe.server_origin";
 
 export const FEEDS = [

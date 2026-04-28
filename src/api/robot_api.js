@@ -58,7 +58,16 @@ const build_url = ({ server_origin, path, query = {} }) => {
  */
 export const get_server_origin = () =>
   // Load backend origin from localStorage (falls back to DEFAULT_SERVER_ORIGIN).
-  localStorage.getItem(SERVER_ORIGIN_STORAGE_KEY) ?? DEFAULT_SERVER_ORIGIN;
+  // Migration: old builds defaulted to :8000 while current backend runs on :8002.
+  (() => {
+    const stored = localStorage.getItem(SERVER_ORIGIN_STORAGE_KEY);
+    if (!stored) return DEFAULT_SERVER_ORIGIN;
+    if (stored.trim() === "http://localhost:8000") {
+      localStorage.setItem(SERVER_ORIGIN_STORAGE_KEY, DEFAULT_SERVER_ORIGIN);
+      return DEFAULT_SERVER_ORIGIN;
+    }
+    return stored;
+  })();
 
 /**
  * ==============================================================================
