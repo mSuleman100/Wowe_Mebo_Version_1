@@ -73,17 +73,23 @@ const create_ai_instance = ({
 const get_status_report = async (robot_id, get_robot_status) => {
   try {
     const status = await get_robot_status(robot_id);
-    return `
+    const { camera_feed, ...status_without_feed } = status;
+
+    const status_text = `
 Robot ID: ${robot_id}
-Status: ${JSON.stringify(status, null, 2)}
+Status: ${JSON.stringify(status_without_feed, null, 2)}
 Timestamp: ${new Date().toISOString()}
     `.trim();
+
+    return { status_text, camera_feed };
   } catch (error) {
-    return `
+    const status_text = `
 Robot ID: ${robot_id}
 Error getting status: ${error.message}
 Timestamp: ${new Date().toISOString()}
     `.trim();
+
+    return { status_text, camera_feed: null };
   }
 };
 
@@ -96,29 +102,39 @@ Timestamp: ${new Date().toISOString()}
  *  - Looks for command names based on robot type
  * ==============================================================================
  */
-const parse_command_from_response = (response_text, robot_type) => {
+export const parse_command_from_response = (response_text, robot_type) => {
   // Valid command patterns based on robot type
   const robot_type_lower = (robot_type || "wowe").toLowerCase();
 
   const command_patterns =
     robot_type_lower === "mebo"
       ? [
-          "mebo_move_forward",
-          "mebo_move_backward",
+          "mebo_forward",
+          "mebo_reverse",
+          "mebo_stop",
           "mebo_rotate_left",
           "mebo_rotate_right",
-          "mebo_stop",
+          "mebo_rotate_cw",
+          "mebo_rotate_ccw",
           "mebo_claw_open",
           "mebo_claw_close",
+          "mebo_joint1_up",
+          "mebo_joint1_down",
+          "mebo_joint2_up",
+          "mebo_joint2_down",
         ]
       : [
-          "move_up",
-          "move_down",
-          "move_left",
-          "move_right",
+          "up",
+          "down",
+          "left",
+          "right",
           "stop",
           "pick_up",
           "throw",
+          "strike",
+          "burp",
+          "boar",
+          "roar",
         ];
 
   // Search for command in response (case-insensitive)
@@ -151,17 +167,45 @@ const execute_ai_decision = async (instance) => {
   } = instance;
 
   try {
-    // Get current robot status
-    const status_report = await get_status_report(robot_id, get_robot_status);
+    // Get current robot status (includes camera feed)
+    const { status_text, camera_feed } = await get_status_report(robot_id, get_robot_status);
 
     // Ask Claude for next action
+    const examples = robot_type.toLowerCase() === "mebo"
+      ? "mebo_forward, mebo_reverse, mebo_rotate_left, mebo_rotate_right, mebo_stop, mebo_claw_open, mebo_claw_close"
+      : "up, down, left, right, stop, pick_up, throw";
+
     const prompt = `Current robot status:
-${status_report}
+${status_text}
 
-Based on this status, what should the robot do next?
-Respond with ONLY the command name (e.g., move_up, move_down, stop, pick_up, etc.)`;
+Analyze the camera feed. Look for obstacles, walls, or free space. Based on what you see and the status, what should the robot do next?
+Respond with ONLY the command name (e.g., ${examples})`;
 
-    const decision_text = await claude.ask(prompt, system_prompt);
+    let decision_text;
+    if (camera_feed) {
+      try {
+        // Send message with image to Claude
+        const base64_data = camera_feed.includes(",") ? camera_feed.split(",")[1] : camera_feed;
+        const user_message = {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64_data } },
+          ],
+        };
+
+        const response = await claude.call({
+          messages: [user_message],
+          system: system_prompt,
+        });
+        decision_text = response.content[0]?.text || "";
+      } catch (vision_error) {
+        // Fallback to text-only if vision fails
+        decision_text = await claude.ask(prompt, system_prompt);
+      }
+    } else {
+      decision_text = await claude.ask(prompt, system_prompt);
+    }
 
     instance.last_decision_text = decision_text;
     instance.decision_count++;
@@ -295,7 +339,7 @@ export const start_ai_mode = ({
     robot_type,
     robot_id,
     system_prompt,
-    loop_interval_seconds: Math.max(1, Math.min(60, loop_interval_seconds)),
+    loop_interval_seconds: Math.max(0.5, Math.min(60, loop_interval_seconds)),
     server_origin,
     get_robot_status,
     on_status_change,

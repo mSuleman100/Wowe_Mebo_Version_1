@@ -28,9 +28,9 @@ import { clear_claude_settings_remote, fetch_claude_settings, save_claude_settin
 import { render_video_wall } from "../components/video_wall.js";
 import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js?v=settings3";
 import { load_ai_mode_config, save_ai_mode_config, render_ai_mode_card } from "../components/ai_mode_panel.js";
-import { clear_ai_logs } from "../components/ai_logs_panel.js";
+import { clear_ai_logs, add_ai_log, update_ai_logs_display } from "../components/ai_logs_panel.js";
 import { claude } from "../utils/claude.js";
-import { start_ai_mode, stop_ai_mode, is_ai_mode_running, get_ai_instance_info } from "./ai_mode_engine.js";
+import { start_ai_mode, stop_ai_mode, is_ai_mode_running, get_ai_instance_info, parse_command_from_response } from "./ai_mode_engine.js";
 import { el, mount, qs, qsa } from "../utils/dom.js";
 import { setup_joystick, setup_vertical_slider, setup_horizontal_slider } from "../utils/joystick.js";
 
@@ -481,15 +481,46 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
 
   // Get current robot status for AI
   const get_robot_status = async (robot_id) => {
-    // TODO: Integrate with actual robot API to get status
-    // For now, return placeholder status
-    return {
-      robot_id,
-      position: { x: 0, y: 0 },
-      battery: 85,
-      status: "idle",
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const server_origin = server_origin_ref.get();
+      const frame_url = `${server_origin.endsWith("/") ? server_origin.slice(0, -1) : server_origin}/video/${robot_id}?ts=${Date.now()}`;
+
+      const controller = new AbortController();
+      const timeout_id = setTimeout(() => controller.abort(), 3000);
+
+      const frame_response = await fetch(frame_url, { signal: controller.signal });
+      clearTimeout(timeout_id);
+
+      let camera_feed = null;
+
+      if (frame_response.ok) {
+        const blob = await frame_response.blob();
+        const reader = new FileReader();
+        camera_feed = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Failed to read blob"));
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      return {
+        robot_id,
+        position: { x: 0, y: 0 },
+        battery: 85,
+        status: "active",
+        timestamp: new Date().toISOString(),
+        camera_feed,
+      };
+    } catch (error) {
+      return {
+        robot_id,
+        position: { x: 0, y: 0 },
+        battery: 85,
+        status: "active",
+        timestamp: new Date().toISOString(),
+        camera_feed: null,
+      };
+    }
   };
 
   const update_status = (message, is_running) => {
@@ -586,6 +617,118 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
         `✓ AI MODE ACTIVE (${info.decision_count} decisions)`,
         true
       );
+    }
+  }
+
+  // Wire Direct AI Command section
+  const direct_prompt_input = document.getElementById("ai-direct-prompt");
+  const direct_send_btn = document.getElementById("ai-direct-send");
+  const direct_response = document.getElementById("ai-direct-response");
+  const direct_response_text = document.getElementById("ai-direct-response-text");
+  const direct_cmd_title = document.getElementById("ai-direct-cmd-title");
+  const direct_detected_cmd = document.getElementById("ai-direct-detected-cmd");
+  const direct_exec_btn = document.getElementById("ai-direct-exec-btn");
+
+  if (direct_send_btn && direct_prompt_input && direct_response) {
+    let last_detected_command = null;
+
+    direct_send_btn.addEventListener("click", async () => {
+      const prompt_text = direct_prompt_input.value.trim();
+
+      if (!prompt_text) {
+        direct_response_text.textContent = "Please enter a prompt";
+        direct_response_text.className = "ai-mode__info-text ai-mode__info-text--error";
+        direct_response.style.display = "block";
+        return;
+      }
+
+      if (!claude.is_configured()) {
+        direct_response_text.textContent = "Claude API key not configured. Please set it in CONFIG panel.";
+        direct_response_text.className = "ai-mode__info-text ai-mode__info-text--error";
+        direct_response.style.display = "block";
+        return;
+      }
+
+      const selected_robot_id = robot_select.value.trim().toLowerCase();
+      if (!selected_robot_id) {
+        direct_response_text.textContent = "Please select a target robot";
+        direct_response_text.className = "ai-mode__info-text ai-mode__info-text--error";
+        direct_response.style.display = "block";
+        return;
+      }
+
+      direct_send_btn.disabled = true;
+      direct_send_btn.textContent = "SENDING...";
+
+      try {
+        const response = await claude.ask(prompt_text, null);
+
+        direct_response_text.textContent = response;
+        direct_response_text.className = "ai-mode__info-text";
+        direct_response.style.display = "block";
+
+        // Try to parse command
+        const detected_cmd = parse_command_from_response(response, selected_robot_type);
+        last_detected_command = detected_cmd;
+
+        if (detected_cmd) {
+          direct_detected_cmd.textContent = `→ ${detected_cmd}`;
+          direct_detected_cmd.style.display = "block";
+          direct_cmd_title.style.display = "block";
+          direct_exec_btn.style.display = "block";
+        } else {
+          direct_detected_cmd.style.display = "none";
+          direct_cmd_title.style.display = "none";
+          direct_exec_btn.style.display = "none";
+          last_detected_command = null;
+        }
+      } catch (error) {
+        direct_response_text.textContent = `Error: ${error.message}`;
+        direct_response_text.className = "ai-mode__info-text ai-mode__info-text--error";
+        direct_response.style.display = "block";
+        direct_detected_cmd.style.display = "none";
+        direct_cmd_title.style.display = "none";
+        direct_exec_btn.style.display = "none";
+        last_detected_command = null;
+      } finally {
+        direct_send_btn.disabled = false;
+        direct_send_btn.textContent = "SEND TO AI";
+      }
+    });
+
+    if (direct_exec_btn) {
+      direct_exec_btn.addEventListener("click", async () => {
+        if (!last_detected_command) return;
+
+        const robot_id = robot_select.value.trim().toLowerCase();
+        const cmd = last_detected_command;
+
+        try {
+          await send_cmd({
+            cmd,
+            device_id: robot_id,
+            server_origin: server_origin_ref.get(),
+          });
+
+          // Log the executed command
+          add_ai_log({
+            robot_id,
+            status: "command_executed",
+            command: cmd,
+            decision_text: `Direct command: ${cmd}`,
+          });
+
+          // Update logs display
+          update_ai_logs_display();
+
+          // Update response text
+          direct_response_text.textContent = `✓ Command "${cmd}" executed on ${robot_id}`;
+          direct_response_text.className = "ai-mode__info-text ai-mode__info-text--success";
+        } catch (error) {
+          direct_response_text.textContent = `✗ Failed to execute: ${error.message}`;
+          direct_response_text.className = "ai-mode__info-text ai-mode__info-text--error";
+        }
+      });
     }
   }
 };

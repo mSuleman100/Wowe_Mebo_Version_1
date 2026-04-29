@@ -18,9 +18,14 @@
 */
 
 import { load_claude_api_key, load_claude_model } from "../components/config_panel.js";
+import { get_server_origin } from "./robot_api.js";
 
-// Anthropic API endpoint
-const CLAUDE_API_ENDPOINT = "https://api.anthropic.com/v1/messages";
+// Backend proxy endpoint (avoids CORS issues)
+const CLAUDE_PROXY_ENDPOINT = () => {
+  const base = get_server_origin();
+  const normalized = base.endsWith("/") ? base.slice(0, -1) : base;
+  return `${normalized}/claude/settings/call`;
+};
 
 /**
  * ==============================================================================
@@ -84,22 +89,14 @@ export const call_claude_api = async ({
   max_tokens = 1024,
   temperature = 1.0,
 }) => {
-  const api_key = get_claude_api_key();
-  const model = get_claude_model();
-
-  if (!api_key || !api_key.trim()) {
-    throw new Error("Claude API key not configured. Please set it in CONFIG panel.");
-  }
-
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     throw new Error("Messages array is required and cannot be empty.");
   }
 
   const request_body = {
-    model,
+    messages,
     max_tokens,
     temperature,
-    messages,
   };
 
   if (system) {
@@ -107,31 +104,34 @@ export const call_claude_api = async ({
   }
 
   try {
-    const response = await fetch(CLAUDE_API_ENDPOINT, {
+    const response = await fetch(CLAUDE_PROXY_ENDPOINT(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(request_body),
     });
 
     if (!response.ok) {
       const error_data = await response.json();
-      const error_message = error_data?.error?.message || `API Error: ${response.statusText}`;
+      const error_message = error_data?.error || `API Error: ${response.statusText}`;
       throw new Error(error_message);
     }
 
     const data = await response.json();
+
+    if (!data.is_ok) {
+      throw new Error(data.error || "Claude API returned an error");
+    }
+
     return {
-      content: data.content[0]?.text || "",
-      stop_reason: data.stop_reason,
-      usage: data.usage,
+      content: data.content || "",
+      stop_reason: "end_turn",
+      usage: {},
     };
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error("Network error: Unable to reach Claude API. Check your internet connection.");
+      throw new Error("Network error: Unable to reach backend. Check your connection.");
     }
     throw error;
   }
@@ -163,13 +163,6 @@ export const call_claude_api_streaming = async ({
   max_tokens = 1024,
   temperature = 1.0,
 }) => {
-  const api_key = get_claude_api_key();
-  const model = get_claude_model();
-
-  if (!api_key || !api_key.trim()) {
-    throw new Error("Claude API key not configured. Please set it in CONFIG panel.");
-  }
-
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
     throw new Error("Messages array is required and cannot be empty.");
   }
@@ -179,11 +172,9 @@ export const call_claude_api_streaming = async ({
   }
 
   const request_body = {
-    model,
+    messages,
     max_tokens,
     temperature,
-    messages,
-    stream: true,
   };
 
   if (system) {
@@ -191,56 +182,29 @@ export const call_claude_api_streaming = async ({
   }
 
   try {
-    const response = await fetch(CLAUDE_API_ENDPOINT, {
+    const response = await fetch(CLAUDE_PROXY_ENDPOINT(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": api_key,
-        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify(request_body),
     });
 
     if (!response.ok) {
       const error_data = await response.json();
-      const error_message = error_data?.error?.message || `API Error: ${response.statusText}`;
+      const error_message = error_data?.error || `API Error: ${response.statusText}`;
       throw new Error(error_message);
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const json_str = line.slice(6);
-          if (json_str === "[DONE]") continue;
-
-          try {
-            const event = JSON.parse(json_str);
-            if (
-              event.type === "content_block_delta" &&
-              event.delta?.type === "text_delta"
-            ) {
-              on_chunk(event.delta.text);
-            }
-          } catch (e) {
-            // Skip invalid JSON lines
-          }
-        }
-      }
+    const data = await response.json();
+    if (!data.is_ok) {
+      throw new Error(data.error || "Claude API returned an error");
     }
+
+    on_chunk(data.content || "");
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error("Network error: Unable to reach Claude API. Check your internet connection.");
+      throw new Error("Network error: Unable to reach backend. Check your connection.");
     }
     throw error;
   }

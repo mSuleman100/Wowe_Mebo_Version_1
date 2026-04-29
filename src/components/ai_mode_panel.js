@@ -39,7 +39,7 @@ export const load_ai_mode_config = () => {
       robot_id: ROBOTS[0]?.id || "alpha",
       system_prompt: "",
       is_active: false,
-      loop_interval_seconds: 3,
+      loop_interval_seconds: 0.5,
     };
   }
   return JSON.parse(stored);
@@ -152,8 +152,9 @@ export const render_ai_mode_panel_content = () => {
     attrs: {
       id: "ai-loop-interval",
       type: "number",
-      min: "1",
+      min: "0.5",
       max: "60",
+      step: "0.5",
       value: config.loop_interval_seconds,
     },
   });
@@ -168,7 +169,7 @@ export const render_ai_mode_panel_content = () => {
     el({
       tag: "div",
       class_name: "ai-mode__help-text",
-      text: "How often AI makes decisions (1-60 seconds). Shorter = more responsive, longer = fewer API calls.",
+      text: "How often AI makes decisions (0.5-60 seconds). Shorter = better obstacle avoidance & vision feedback. MEBO recommended: 0.5-1 second.",
     }),
     interval_input
   );
@@ -203,6 +204,91 @@ export const render_ai_mode_panel_content = () => {
 
 /**
  * ==============================================================================
+ *  render_direct_prompt_section()
+ *
+ *  Purpose:
+ *  - Render the Direct AI Command section for one-shot prompts
+ * ==============================================================================
+ */
+export const render_direct_prompt_section = () => {
+  const wrap = el({ tag: "div", class_name: "ai-mode__direct-section" });
+
+  // Label
+  const label = el({
+    tag: "label",
+    class_name: "label",
+    text: "DIRECT AI COMMAND",
+  });
+
+  // Prompt textarea
+  const prompt_textarea = el({
+    tag: "textarea",
+    class_name: "ai-mode__textarea",
+    attrs: {
+      id: "ai-direct-prompt",
+      placeholder: "Type a prompt for Claude...",
+    },
+  });
+
+  // Send button
+  const send_btn = el({
+    tag: "button",
+    class_name: "btn btn--primary ai-mode__btn-send",
+    attrs: { id: "ai-direct-send", type: "button" },
+    text: "SEND TO AI",
+  });
+
+  // Response container
+  const response_container = el({
+    tag: "div",
+    class_name: "ai-mode__info",
+    attrs: { id: "ai-direct-response", style: "display: none;" },
+  });
+
+  response_container.append(
+    el({
+      tag: "div",
+      class_name: "ai-mode__info-title",
+      text: "CLAUDE RESPONSE",
+    }),
+    el({
+      tag: "div",
+      class_name: "ai-mode__info-text",
+      attrs: { id: "ai-direct-response-text" },
+    }),
+    el({
+      tag: "div",
+      class_name: "ai-mode__info-title",
+      attrs: { id: "ai-direct-cmd-title", style: "display: none; margin-top: 8px;" },
+      text: "DETECTED COMMAND",
+    }),
+    el({
+      tag: "div",
+      class_name: "ai-log__command",
+      attrs: { id: "ai-direct-detected-cmd", style: "display: none;" },
+    })
+  );
+
+  // Execute button
+  const exec_btn = el({
+    tag: "button",
+    class_name: "btn btn--secondary",
+    attrs: { id: "ai-direct-exec-btn", type: "button", style: "display: none;" },
+    text: "EXECUTE COMMAND",
+  });
+
+  wrap.append(
+    label,
+    prompt_textarea,
+    send_btn,
+    response_container,
+    exec_btn
+  );
+  return wrap;
+};
+
+/**
+ * ==============================================================================
  *  render_ai_mode_card()
  *
  *  Purpose:
@@ -228,14 +314,21 @@ export const render_ai_mode_card = () => {
   const controls_section = el({ tag: "div", class_name: "ai-mode-controls" });
   controls_section.append(render_ai_mode_panel_content());
 
-  // Divider
-  const divider = el({ tag: "div", class_name: "divider" });
+  // Divider 1
+  const divider1 = el({ tag: "div", class_name: "divider" });
+
+  // Direct prompt section
+  const direct_section = el({ tag: "div", class_name: "ai-mode-direct" });
+  direct_section.append(render_direct_prompt_section());
+
+  // Divider 2
+  const divider2 = el({ tag: "div", class_name: "divider" });
 
   // Logs section
   const logs_section = el({ tag: "div", class_name: "ai-mode-logs" });
   logs_section.append(render_ai_logs_panel());
 
-  content.append(controls_section, divider, logs_section);
+  content.append(controls_section, divider1, direct_section, divider2, logs_section);
   card.append(header, content);
   return card;
 };

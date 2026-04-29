@@ -26,6 +26,7 @@ def get_claude_settings() -> dict[str, str | bool | None]:
         "is_ok": True,
         "is_configured": bool((api_key or "").strip()),
         "model": model,
+        "api_key": api_key,
         "api_key_masked": _mask_api_key(api_key),
     }
 

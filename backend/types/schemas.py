@@ -89,3 +89,20 @@ class ClaudeSettingsUpdateRequest(BaseModel):
 class ClaudeModelUpdateRequest(BaseModel):
     model: str
 
+
+class ClaudeMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ClaudeAPIRequest(BaseModel):
+    messages: list[ClaudeMessage]
+    system: str | None = None
+    max_tokens: int = 1024
+    temperature: float = 1.0
+
+
+class ClaudeAPIResponse(BaseModel):
+    is_ok: bool
+    content: str = ""
+    error: str | None = None
