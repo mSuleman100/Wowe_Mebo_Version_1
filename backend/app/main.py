@@ -16,6 +16,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.routers.ai_routes import router as ai_router
 from backend.routers.cmd_routes import router as cmd_router
 from backend.routers.claude_settings_routes import router as claude_settings_router
 from backend.routers.debug_routes import router as debug_router
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(video_router)
     app.include_router(cmd_router)
     app.include_router(claude_settings_router)
+    app.include_router(ai_router)  # AI mode endpoints
     app.include_router(sequence_router)
     app.include_router(ir_router)
     app.include_router(mebo_router)

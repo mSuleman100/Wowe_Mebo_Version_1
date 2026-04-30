@@ -2265,40 +2265,46 @@ select.input {
 }
 
 .ai-mode__type-selector {
+  background: rgba(15, 35, 52, 0.6);
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(70, 160, 190, 0.3);
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 
 .ai-mode__type-selector .label {
   grid-column: 1 / -1;
 }
 
-.ai-mode__type-btn {
-  padding: 8px 12px;
-  background: rgba(39, 211, 255, 0.15);
-  border: 2px solid rgba(39, 211, 255, 0.3);
-  color: rgba(39, 211, 255, 0.92);
-  border-radius: var(--radius-sm);
-  font-weight: 700;
-  text-transform: uppercase;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 200ms ease;
-  letter-spacing: 0.10em;
-  line-height: 1.4;
+.ai-mode__type-selector .selector-buttons {
+  display: flex;
+  gap: 8px;
 }
 
-.ai-mode__type-btn:hover {
-  border-color: rgba(39, 211, 255, 0.55);
-  background: rgba(39, 211, 255, 0.25);
+.ai-mode__type-btn {
+  flex: 1;
+  padding: 10px 12px;
+  background: rgba(39, 211, 255, 0.15);
+  border: 2px solid #27d3ff;
+  color: #27d3ff;
+  border-radius: 6px;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.ai-mode__type-btn:hover:not(.active) {
+  background: rgba(39, 211, 255, 0.3);
 }
 
 .ai-mode__type-btn.active {
-  background: rgba(39, 211, 255, 0.6);
-  color: rgba(10, 24, 36, 0.96);
-  border-color: rgba(39, 211, 255, 0.8);
-  box-shadow: 0 0 12px rgba(39, 211, 255, 0.4);
+  background: #27d3ff;
+  color: #0b1620;
 }
 
 .ai-mode__section {
@@ -2414,6 +2420,27 @@ select.input {
   border: 1px solid rgba(39, 211, 255, 0.25);
   display: grid;
   gap: 4px;
+  max-height: 250px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ai-mode__info::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-mode__info::-webkit-scrollbar-track {
+  background: rgba(39, 211, 255, 0.05);
+  border-radius: 3px;
+}
+
+.ai-mode__info::-webkit-scrollbar-thumb {
+  background: rgba(39, 211, 255, 0.3);
+  border-radius: 3px;
+}
+
+.ai-mode__info::-webkit-scrollbar-thumb:hover {
+  background: rgba(39, 211, 255, 0.5);
 }
 
 .ai-mode__info-title {

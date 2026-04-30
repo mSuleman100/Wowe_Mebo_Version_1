@@ -78,6 +78,8 @@ export const render_ai_mode_panel_content = () => {
     text: "ROBOT TYPE",
   });
 
+  const buttons_container = el({ tag: "div", class_name: "selector-buttons" });
+
   const woweBtn = el({
     tag: "button",
     class_name: `ai-mode__type-btn ${config.robot_type === "wowe" ? "active" : ""}`,
@@ -92,7 +94,8 @@ export const render_ai_mode_panel_content = () => {
     text: "MEBO",
   });
 
-  type_section.append(type_label, woweBtn, meboBtn);
+  buttons_container.append(woweBtn, meboBtn);
+  type_section.append(type_label, buttons_container);
 
   // Robot Selection
   const robot_section = el({ tag: "div", class_name: "ai-mode__section" });

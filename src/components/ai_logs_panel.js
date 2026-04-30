@@ -251,3 +251,35 @@ export const update_ai_logs_display = () => {
   // Auto-scroll to top
   logs_list.scrollTop = 0;
 };
+
+/**
+ * ==============================================================================
+ *  display_backend_logs()
+ *
+ *  Purpose:
+ *  - Display logs fetched from backend API
+ * ==============================================================================
+ */
+export const display_backend_logs = (backend_logs) => {
+  const logs_list = document.getElementById("ai-logs-list");
+  if (!logs_list) return;
+
+  logs_list.replaceChildren();
+
+  if (!backend_logs || backend_logs.length === 0) {
+    logs_list.append(
+      el({
+        tag: "div",
+        class_name: "ai-logs__empty",
+        text: "No AI activity yet. Start AI mode to see logs.",
+      })
+    );
+  } else {
+    for (const log of backend_logs) {
+      logs_list.append(render_log_entry(log));
+    }
+  }
+
+  // Auto-scroll to top
+  logs_list.scrollTop = 0;
+};

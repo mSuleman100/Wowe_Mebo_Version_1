@@ -28,9 +28,8 @@ import { clear_claude_settings_remote, fetch_claude_settings, save_claude_settin
 import { render_video_wall } from "../components/video_wall.js";
 import { load_claude_api_key, save_claude_api_key, clear_claude_api_key, load_claude_model, save_claude_model, render_config_card } from "../components/config_panel.js?v=settings3";
 import { load_ai_mode_config, save_ai_mode_config, render_ai_mode_card } from "../components/ai_mode_panel.js";
-import { clear_ai_logs, add_ai_log, update_ai_logs_display } from "../components/ai_logs_panel.js";
+import { update_ai_logs_display, add_ai_log, display_backend_logs } from "../components/ai_logs_panel.js";
 import { claude } from "../utils/claude.js";
-import { start_ai_mode, stop_ai_mode, is_ai_mode_running, get_ai_instance_info, parse_command_from_response } from "./ai_mode_engine.js";
 import { el, mount, qs, qsa } from "../utils/dom.js";
 import { setup_joystick, setup_vertical_slider, setup_horizontal_slider } from "../utils/joystick.js";
 
@@ -385,12 +384,65 @@ const bind_server_settings = ({ server_origin_ref, on_change }) => {
  */
 /**
  * ==============================================================================
+ *  parse_command_from_response()
+ *
+ *  Purpose:
+ *  - Extract command name from Claude's response (local helper)
+ *  - Used by Direct AI Command feature
+ * ==============================================================================
+ */
+const parse_command_from_response = (response_text, robot_type) => {
+  const robot_type_lower = (robot_type || "wowe").toLowerCase();
+
+  const command_patterns =
+    robot_type_lower === "mebo"
+      ? [
+          "mebo_forward",
+          "mebo_reverse",
+          "mebo_stop",
+          "mebo_rotate_left",
+          "mebo_rotate_right",
+          "mebo_rotate_cw",
+          "mebo_rotate_ccw",
+          "mebo_claw_open",
+          "mebo_claw_close",
+          "mebo_joint1_up",
+          "mebo_joint1_down",
+          "mebo_joint2_up",
+          "mebo_joint2_down",
+        ]
+      : [
+          "up",
+          "down",
+          "left",
+          "right",
+          "stop",
+          "pick_up",
+          "throw",
+          "strike",
+          "burp",
+          "boar",
+          "roar",
+        ];
+
+  const response_lower = (response_text || "").toLowerCase();
+  for (const cmd of command_patterns) {
+    if (response_lower.includes(cmd.toLowerCase())) {
+      return cmd;
+    }
+  }
+
+  return null;
+};
+
+/**
+ * ==============================================================================
  *  bind_ai_mode_panel()
  *
  *  Purpose:
  *  - Wire AI MODE tab button handlers (START / STOP)
- *  - Manage AI mode background loop
- *  - Get robot status for AI decision making
+ *  - Call backend API for AI decision loop management
+ *  - Poll backend for status and logs updates
  * ==============================================================================
  */
 const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_registry_ref }) => {
@@ -407,6 +459,8 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
   if (!robot_select || !prompt_textarea || !start_btn || !stop_btn || !status) return;
 
   let selected_robot_type = load_ai_mode_config().robot_type;
+  let polling_interval = null;
+
   const render_ai_robot_options = ({ preferred_robot_id } = {}) => {
     const robots = (settings_robot_registry_ref?.get?.() ?? []).filter(
       (item) => item.type === selected_robot_type
@@ -463,65 +517,27 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
 
   // Wire clear logs button
   if (clear_logs_btn) {
-    clear_logs_btn.addEventListener("click", () => {
-      clear_ai_logs();
-      const logs_list = document.getElementById("ai-logs-list");
-      if (logs_list) {
-        logs_list.replaceChildren();
-        logs_list.append(
-          el({
-            tag: "div",
-            class_name: "ai-logs__empty",
-            text: "No AI activity yet. Start AI mode to see logs.",
-          })
-        );
+    clear_logs_btn.addEventListener("click", async () => {
+      const robot_id = robot_select.value.trim().toLowerCase();
+      try {
+        const server_origin = server_origin_ref.get();
+        await fetch(`${server_origin}/ai/clear-logs/${robot_id}`, { method: "POST" });
+        const logs_list = document.getElementById("ai-logs-list");
+        if (logs_list) {
+          logs_list.replaceChildren();
+          logs_list.append(
+            el({
+              tag: "div",
+              class_name: "ai-logs__empty",
+              text: "No AI activity yet. Start AI mode to see logs.",
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Failed to clear logs:", error);
       }
     });
   }
-
-  // Get current robot status for AI
-  const get_robot_status = async (robot_id) => {
-    try {
-      const server_origin = server_origin_ref.get();
-      const frame_url = `${server_origin.endsWith("/") ? server_origin.slice(0, -1) : server_origin}/video/${robot_id}?ts=${Date.now()}`;
-
-      const controller = new AbortController();
-      const timeout_id = setTimeout(() => controller.abort(), 3000);
-
-      const frame_response = await fetch(frame_url, { signal: controller.signal });
-      clearTimeout(timeout_id);
-
-      let camera_feed = null;
-
-      if (frame_response.ok) {
-        const blob = await frame_response.blob();
-        const reader = new FileReader();
-        camera_feed = await new Promise((resolve, reject) => {
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(new Error("Failed to read blob"));
-          reader.readAsDataURL(blob);
-        });
-      }
-
-      return {
-        robot_id,
-        position: { x: 0, y: 0 },
-        battery: 85,
-        status: "active",
-        timestamp: new Date().toISOString(),
-        camera_feed,
-      };
-    } catch (error) {
-      return {
-        robot_id,
-        position: { x: 0, y: 0 },
-        battery: 85,
-        status: "active",
-        timestamp: new Date().toISOString(),
-        camera_feed: null,
-      };
-    }
-  };
 
   const update_status = (message, is_running) => {
     status.textContent = message;
@@ -530,24 +546,42 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
     }`;
   };
 
-  const on_ai_status_change = (info) => {
-    const { status: state, robot_id, error, command } = info;
+  const poll_ai_status = async (robot_id) => {
+    try {
+      const server_origin = server_origin_ref.get();
 
-    if (state === "started") {
-      update_status(`✓ AI MODE ACTIVE (${robot_id})`, true);
-    } else if (state === "stopped") {
-      update_status(`⊙ AI MODE STOPPED (${robot_id})`, false);
-    } else if (state === "decision_executed") {
-      update_status(`⟳ DECISION: ${command} (${robot_id})`, true);
-    } else if (state === "error") {
-      update_status(`✗ ERROR: ${error}`, true);
+      // Get status
+      const status_response = await fetch(`${server_origin}/ai/status/${robot_id}`);
+      if (!status_response.ok) return;
+
+      const status_data = await status_response.json();
+      if (!status_data.success) return;
+
+      const ai_status = status_data.data;
+
+      if (ai_status.is_running) {
+        update_status(`✓ AI ACTIVE | Pos: (${ai_status.position.x.toFixed(2)}, ${ai_status.position.y.toFixed(2)}) | Decisions: ${ai_status.decision_count}`, true);
+      } else {
+        update_status(`⊙ AI STOPPED (${ai_status.decision_count} decisions)`, false);
+      }
+
+      // Get and display logs from backend
+      const logs_response = await fetch(`${server_origin}/ai/logs/${robot_id}`);
+      if (logs_response.ok) {
+        const logs_data = await logs_response.json();
+        if (logs_data.success) {
+          display_backend_logs(logs_data.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to poll status:", error);
     }
   };
 
-  start_btn.addEventListener("click", () => {
+  start_btn.addEventListener("click", async () => {
     const robot_id = robot_select.value.trim().toLowerCase();
     const system_prompt = prompt_textarea.value.trim();
-    const interval_seconds = parseInt(interval_input.value) || 3;
+    const interval_seconds = parseFloat(interval_input.value) || 0.5;
 
     if (!system_prompt) {
       update_status("✗ System prompt required", false);
@@ -568,38 +602,72 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
       is_active: true,
     });
 
-    // Start AI mode
+    // Call backend API to start AI
     try {
-      start_ai_mode({
-        robot_type: selected_robot_type,
-        robot_id,
-        system_prompt,
-        loop_interval_seconds: interval_seconds,
-        server_origin: server_origin_ref.get(),
-        get_robot_status,
-        on_status_change: on_ai_status_change,
+      const server_origin = server_origin_ref.get();
+      update_status("⟳ Starting AI...", true);
+
+      const response = await fetch(`${server_origin}/ai/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          robot_type: selected_robot_type,
+          robot_id,
+          system_prompt,
+          loop_interval_seconds: interval_seconds,
+          server_origin,
+        }),
       });
 
+      if (!response.ok) {
+        const error_data = await response.json();
+        throw new Error(error_data.detail || "Failed to start AI");
+      }
+
       update_status(`✓ AI MODE ACTIVE (${robot_id})`, true);
+
+      // Start polling for status updates
+      if (polling_interval) clearInterval(polling_interval);
+      polling_interval = setInterval(() => poll_ai_status(robot_id), 1000);
     } catch (error) {
       update_status(`✗ Failed to start: ${error.message}`, false);
     }
   });
 
-  stop_btn.addEventListener("click", () => {
+  stop_btn.addEventListener("click", async () => {
     const robot_id = robot_select.value.trim().toLowerCase();
 
-    stop_ai_mode(robot_id);
+    // Stop polling
+    if (polling_interval) {
+      clearInterval(polling_interval);
+      polling_interval = null;
+    }
 
-    save_ai_mode_config({
-      robot_type: selected_robot_type,
-      robot_id,
-      system_prompt: prompt_textarea.value.trim(),
-      loop_interval_seconds: parseInt(interval_input.value) || 3,
-      is_active: false,
-    });
+    // Call backend API to stop AI
+    try {
+      const server_origin = server_origin_ref.get();
+      const response = await fetch(`${server_origin}/ai/stop`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ robot_id }),
+      });
 
-    update_status(`⊙ AI MODE STOPPED (${robot_id})`, false);
+      if (!response.ok) {
+        throw new Error("Failed to stop AI");
+      }
+
+      save_ai_mode_config({
+        robot_type: selected_robot_type,
+        robot_id,
+        system_prompt: prompt_textarea.value.trim(),
+        loop_interval_seconds: parseFloat(interval_input.value) || 0.5,
+        is_active: false,
+      });
+
+      update_status(`⊙ AI MODE STOPPED (${robot_id})`, false);
+    } catch (error) {
+      update_status(`✗ Failed to stop: ${error.message}`, false);
+    }
   });
 
   // Load saved config
@@ -608,17 +676,6 @@ const bind_ai_mode_panel = ({ server_origin_ref, robot_ref, settings_robot_regis
   render_ai_robot_options({ preferred_robot_id: config.robot_id });
   prompt_textarea.value = config.system_prompt;
   interval_input.value = config.loop_interval_seconds;
-
-  // Show status if AI was running
-  if (config.is_active && is_ai_mode_running(config.robot_id)) {
-    const info = get_ai_instance_info(config.robot_id);
-    if (info) {
-      update_status(
-        `✓ AI MODE ACTIVE (${info.decision_count} decisions)`,
-        true
-      );
-    }
-  }
 
   // Wire Direct AI Command section
   const direct_prompt_input = document.getElementById("ai-direct-prompt");
