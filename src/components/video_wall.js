@@ -76,12 +76,18 @@ const render_feed_tile = ({ feed }) => {
  *  render_video_wall()
  *
  *  Purpose:
- *  - Render the 2x2 video wall containing all feed tiles
+ *  - Render the video wall containing all feed tiles (dynamically sized)
+ *  - Grid automatically adjusts based on number of feeds
  * ==============================================================================
  */
 export const render_video_wall = ({ feeds }) => {
   // Build the wall container and append tiles for each feed.
-  const wall = el({ tag: "div", class_name: "video-wall" });
+  // Set data attribute with feed count for CSS grid adjustment
+  const wall = el({
+    tag: "div",
+    class_name: "video-wall",
+    attrs: { "data-feed-count": feeds.length }
+  });
   for (const feed of feeds) wall.append(render_feed_tile({ feed }));
   return wall;
 };

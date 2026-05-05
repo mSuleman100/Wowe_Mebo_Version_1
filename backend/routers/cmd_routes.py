@@ -98,14 +98,23 @@ async def post_cmd(cmd: str, device_id: str = Query(default="alpha", description
 
         # Push instantly via WebSocket if ESP32 is connected, else fall back to queue
         ws = get_ws(device_id=device_id)
+        import logging
+        logger = logging.getLogger("uvicorn.error")
+
         if ws:
             try:
-                await ws.send_text(f"CMD:{uuid4()}:{arduino_cmd}")
-            except Exception:
+                msg_id = str(uuid4())
+                msg_text = f"CMD:{msg_id}:{arduino_cmd}"
+                logger.info(f"MEBO: Sending via WS → device={device_id} cmd={cmd} arduino={arduino_cmd} msg={msg_text}")
+                await ws.send_text(msg_text)
+                logger.info(f"MEBO: WS send successful → {msg_text}")
+            except Exception as e:
                 # WS is dead — unregister and let ESP32 reconnect (do NOT queue,
                 # new ESP32 code is WS-only and won't poll the queue)
+                logger.error(f"MEBO: WS send failed → device={device_id} error={e}")
                 unregister_ws(device_id=device_id)
         else:
+            logger.warning(f"MEBO: No WS connection → device={device_id}, using queue fallback")
             enqueue_mebo(device_id=device_id, ui_cmd=cmd, arduino_cmd=arduino_cmd)
 
         return CommandResponse(is_ok=True, cmd=cmd)

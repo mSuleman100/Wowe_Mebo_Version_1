@@ -141,11 +141,32 @@ const bind_motion_buttons = ({ server_origin_ref, robot_ref }) => {
  */
 const bind_global_halt = ({ server_origin_ref, robot_ref }) => {
   // Global HALT can be triggered via button or Spacebar.
+  // Stops all AI instances AND sends HALT/STOP to all robots
+
+  const execute_global_halt = async () => {
+    const server_origin = server_origin_ref.get();
+    try {
+      // Call backend to stop all AI and send stop commands to all robots
+      const response = await fetch(`${server_origin}/ai/halt-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("🛑 GLOBAL HALT executed:", result);
+      } else {
+        console.error("Global halt failed:", response.statusText);
+      }
+    } catch (error) {
+      console.error("Global halt error:", error);
+    }
+  };
+
   const halt_btn = document.getElementById("halt-btn");
-  if (halt_btn)
-    halt_btn.addEventListener("click", async () => {
-      await send_halt({ device_id: get_target_device_id({ robot_ref }), server_origin: server_origin_ref.get() });
-    });
+  if (halt_btn) {
+    halt_btn.addEventListener("click", execute_global_halt);
+  }
 
   window.addEventListener("keydown", async (event) => {
     if (event.code !== "Space") return;
@@ -155,7 +176,7 @@ const bind_global_halt = ({ server_origin_ref, robot_ref }) => {
       return;
     }
     event.preventDefault();
-    await send_halt({ device_id: get_target_device_id({ robot_ref }), server_origin: server_origin_ref.get() });
+    await execute_global_halt();
   });
 };
 
@@ -1311,6 +1332,30 @@ const create_ref = (value) => ({
 
 /**
  * ==============================================================================
+ *  generate_feeds_from_robots()
+ *
+ *  Purpose:
+ *  - Convert registered robots into feed objects for the video wall
+ *  - Each robot becomes one feed tile
+ *  - First robot is marked as active for styling
+ * ==============================================================================
+ */
+const generate_feeds_from_robots = ({ robots_registry }) => {
+  const robots = robots_registry.get() || [];
+  if (robots.length === 0) {
+    // Return default feeds if no robots registered
+    return FEEDS;
+  }
+  // Convert robots to feeds (use device_id as feed id, name as label)
+  return robots.map((robot, index) => ({
+    id: robot.feed_id || robot.device_id,
+    label: robot.name,
+    is_active: index === 0,  // Mark first robot as active
+  }));
+};
+
+/**
+ * ==============================================================================
  *  bootstrap_app()
  *
  *  Purpose:
@@ -1721,12 +1766,30 @@ export const bootstrap_app = ({ root_element_id }) => {
   // let execution_mode_ref = null;
   // let queue_handlers = null;
 
-  // Initial render: Dashboard view
-  left.append(render_video_wall({ feeds: FEEDS }));
+  // Initial render: Dashboard view (using dynamic feeds from registered robots)
+  const current_feeds_ref = create_ref(generate_feeds_from_robots({ robots_registry: settings_robot_registry_ref }));
+  const video_wall_container = el({ tag: "div", class_name: "video-wall-container", attrs: { id: "video-wall-container" } });
+  video_wall_container.append(render_video_wall({ feeds: current_feeds_ref.get() }));
+  left.append(video_wall_container);
+
   const control_panel = render_control_panel();
   const legacy_config_tab = control_panel.querySelector("#tab-config");
   if (legacy_config_tab) legacy_config_tab.remove();
   right.append(control_panel, render_sequence_editor());
+
+  // Function to re-render video wall when robots change
+  const update_video_wall = () => {
+    const new_feeds = generate_feeds_from_robots({ robots_registry: settings_robot_registry_ref });
+    current_feeds_ref.set(new_feeds);
+    const container = document.getElementById("video-wall-container");
+    if (container) {
+      container.replaceChildren(render_video_wall({ feeds: new_feeds }));
+      // Start MJPEG streams for all feeds
+      for (const feed of new_feeds) {
+        start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
+      }
+    }
+  };
 
   // Tab switching (on right side control panel)
   let current_right_tab = "control";
@@ -1763,7 +1826,7 @@ export const bootstrap_app = ({ root_element_id }) => {
         bind_server_settings({
           server_origin_ref,
           on_change: () => {
-            for (const feed of FEEDS) start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
+            for (const feed of current_feeds_ref.get()) start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
           },
         });
         bind_robot_type_selector({ robot_type_ref, save_robot_type, switch_right_tab });
@@ -1792,7 +1855,7 @@ export const bootstrap_app = ({ root_element_id }) => {
         bind_server_settings({
           server_origin_ref,
           on_change: () => {
-            for (const feed of FEEDS) start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
+            for (const feed of current_feeds_ref.get()) start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
           },
         });
         bind_robot_type_selector({ robot_type_ref, save_robot_type, switch_right_tab });
@@ -1887,7 +1950,10 @@ export const bootstrap_app = ({ root_element_id }) => {
     bind_robot_management_panel({
       robot_registry_ref: settings_robot_registry_ref,
       server_origin_ref,
-      on_change: () => render_settings_view(),
+      on_change: () => {
+        render_settings_view();
+        update_video_wall();  // Re-render video wall when robots change
+      },
     });
   };
 
@@ -1948,6 +2014,9 @@ export const bootstrap_app = ({ root_element_id }) => {
   // Initial bindings are handled by switch_right_tab("control")
   // which checks robot type and binds accordingly
 
+  // Bind global halt button (works on all tabs)
+  bind_global_halt({ server_origin_ref, robot_ref });
+
   const conn_pill = qs({ selector: "#conn-pill" });
   if (conn_pill) set_conn_pill({ element: conn_pill, is_online: false, text: "CONNECTING…" });
 
@@ -1955,7 +2024,10 @@ export const bootstrap_app = ({ root_element_id }) => {
     // MJPEG handles continuous video; we only need health polling.
     const health_ms = 1500;
 
-    for (const feed of FEEDS) start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
+    // Start MJPEG streams for all current feeds
+    for (const feed of current_feeds_ref.get()) {
+      start_mjpeg_stream({ feed_id: feed.id, server_origin: server_origin_ref.get() });
+    }
 
     setInterval(async () => {
       if (!conn_pill) return;

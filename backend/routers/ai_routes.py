@@ -126,3 +126,59 @@ async def check_running(robot_id: str) -> dict:
     """Check if AI is running for a robot"""
     running = is_ai_running(robot_id)
     return {"success": True, "is_running": running}
+
+
+@router.post("/halt-all")
+async def halt_all() -> dict:
+    """GLOBAL HALT - Stop all AI instances and send stop commands to all robots"""
+    import httpx
+    from backend.state.robot_registry import list_robots
+
+    try:
+        logger.info("🛑 GLOBAL HALT INITIATED")
+
+        # Stop all running AI instances
+        instances = get_all_ai_instances()
+        stopped_ai = []
+
+        logger.info(f"Found {len(instances)} AI instances to stop")
+        for robot_id, instance_data in instances.items():
+            await stop_ai_mode(robot_id)
+            stopped_ai.append(robot_id)
+            logger.info(f"✓ GLOBAL HALT: AI stopped for {robot_id}")
+
+        # Send HALT/STOP commands to all registered robots
+        all_robots = list_robots()
+        stopped_robots = []
+        logger.info(f"Found {len(all_robots)} registered robots: {[r.get('device_id') for r in all_robots]}")
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            for robot in all_robots:
+                device_id = robot.get("device_id")
+                robot_type = robot.get("type", "wowe").lower()
+
+                # Use appropriate stop command for robot type
+                if robot_type == "mebo":
+                    stop_cmd = "mebo_stop"
+                else:  # WOWE
+                    stop_cmd = "stop"
+
+                try:
+                    await client.post(
+                        f"http://localhost:8002/cmd/{stop_cmd}?device_id={device_id}"
+                    )
+                    stopped_robots.append(device_id)
+                    logger.info(f"✓ GLOBAL HALT: Sent {stop_cmd} to {device_id} (type={robot_type})")
+                except Exception as e:
+                    logger.warning(f"✗ GLOBAL HALT: Failed to halt {device_id}: {e}")
+
+        return {
+            "success": True,
+            "message": "GLOBAL HALT executed",
+            "stopped_ai_robots": stopped_ai,
+            "stopped_all_robots": stopped_robots,
+        }
+
+    except Exception as e:
+        logger.error(f"GLOBAL HALT failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

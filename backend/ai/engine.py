@@ -184,30 +184,34 @@ INSTRUCTIONS:
         """Fetch camera feed from robot"""
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(
-                    f"{self.server_origin}/video/{self.robot_id}?ts={int(time.time() * 1000)}"
-                )
+                url = f"{self.server_origin}/video/{self.robot_id}?ts={int(time.time() * 1000)}"
+                logger.info(f"AI: Fetching camera from {url}")
+                response = await client.get(url)
+
                 if response.status_code == 200:
-                    # Convert to base64
                     import base64
-                    return base64.b64encode(response.content).decode('utf-8')
+                    frame_b64 = base64.b64encode(response.content).decode('utf-8')
+                    logger.info(f"AI: Camera frame fetched successfully ({len(response.content)} bytes)")
+                    return frame_b64
+                else:
+                    logger.warning(f"AI: Camera fetch returned {response.status_code} for {self.robot_id}")
         except Exception as e:
-            logger.warning(f"Failed to fetch camera for {self.robot_id}: {e}")
+            logger.error(f"AI: Failed to fetch camera for {self.robot_id}: {e}")
         return None
 
     def parse_command_from_response(self, response_text: str) -> Optional[str]:
         """Extract command from Claude's response"""
         if self.robot_type.lower() == "mebo":
             commands = [
-                "mebo_forward", "mebo_reverse", "mebo_stop",
+                "mebo_joint1_up", "mebo_joint1_down",
+                "mebo_joint2_up", "mebo_joint2_down",
                 "mebo_rotate_left", "mebo_rotate_right",
                 "mebo_rotate_cw", "mebo_rotate_ccw",
                 "mebo_claw_open", "mebo_claw_close",
-                "mebo_joint1_up", "mebo_joint1_down",
-                "mebo_joint2_up", "mebo_joint2_down",
+                "mebo_forward", "mebo_reverse", "mebo_stop",
             ]
         else:
-            commands = ["up", "down", "left", "right", "stop", "pick_up", "throw"]
+            commands = ["pick_up", "throw", "up", "down", "left", "right", "stop"]
 
         response_lower = response_text.lower()
         for cmd in commands:
@@ -239,18 +243,42 @@ INSTRUCTIONS:
             status_text = await self.get_status_report()
             camera_feed = await self.fetch_camera_feed()
 
-            # Prepare prompt for Claude
-            examples = "mebo_forward, mebo_reverse, mebo_rotate_left, mebo_rotate_right, mebo_stop, mebo_claw_open, mebo_claw_close"
+            # Prepare prompt for Claude - DYNAMIC based on robot type
+            if self.robot_type.lower() == "mebo":
+                examples = "mebo_forward, mebo_reverse, mebo_rotate_left, mebo_rotate_right, mebo_stop, mebo_claw_open, mebo_claw_close"
+                forward_cmd = "mebo_forward"
+                rotate_cmds = "mebo_rotate_left or mebo_rotate_right"
+            else:  # WOWE
+                examples = "up, down, left, right, stop, halt, pick_up, throw, strike, burp, boar, roar"
+                forward_cmd = "up"
+                rotate_cmds = "left or right"
+
             prompt = f"""Current robot status:
 {status_text}
 
-Analyze the camera feed. Look for obstacles, walls, targets, or free space. Based on what you see and your position, what should the robot do next?
-Respond with ONLY the command name (e.g., {examples})"""
+CRITICAL VISION TASK - Analyze camera feed:
+1. Look at the FLOOR directly in front of you (the surface)
+2. Is there ANY visible floor space you could move into?
+3. Even if far away, if you can see open floor ahead, GO THERE
+
+NAVIGATION RULES:
+- If you see floor/open space ahead → {forward_cmd} (AGGRESSIVE)
+- If completely blocked by walls/objects → {rotate_cmds}
+- Only stop if you hit an obstacle or are truly stuck
+- PREFER MOVEMENT over stopping
+
+GOAL: Navigate, explore, find open space. Don't be timid.
+
+RESPONSE FORMAT:
+First describe what you see in one short sentence.
+Then on the next line respond with ONLY the command name.
+Valid commands: {examples}"""
 
             # Call Claude with or without image
             if camera_feed:
                 try:
                     # Send with image
+                    logger.info(f"AI: Sending vision request with camera frame ({len(camera_feed)} chars base64)")
                     user_message = {
                         "role": "user",
                         "content": [
@@ -271,8 +299,9 @@ Respond with ONLY the command name (e.g., {examples})"""
                         system=self.system_prompt,
                         messages=[user_message]
                     )
+                    logger.info(f"AI: Vision request successful for {self.robot_id}")
                 except Exception as vision_error:
-                    logger.warning(f"Vision error, falling back to text: {vision_error}")
+                    logger.error(f"AI: Vision error for {self.robot_id}, falling back to text: {vision_error}")
                     # Fallback to text only
                     response = self.client.messages.create(
                         model="claude-opus-4-7",
@@ -282,7 +311,7 @@ Respond with ONLY the command name (e.g., {examples})"""
                     )
             else:
                 # No camera feed, use text only
-                logger.warning(f"No camera feed for {self.robot_id}, using text-only")
+                logger.error(f"AI: No camera feed for {self.robot_id}, using text-only mode (blind navigation)")
                 response = self.client.messages.create(
                     model="claude-opus-4-7",
                     max_tokens=100,
@@ -294,16 +323,30 @@ Respond with ONLY the command name (e.g., {examples})"""
             self.last_decision_text = decision_text
             self.decision_count += 1
 
-            # Log decision
+            # Parse response: extract analysis and command
+            lines = decision_text.strip().split('\n')
+            analysis = ""
+            command_line = ""
+
+            if len(lines) >= 2:
+                analysis = lines[0].strip()
+                command_line = lines[1].strip()
+            elif len(lines) == 1:
+                command_line = lines[0].strip()
+
+            # Log full analysis
+            full_analysis = f"{analysis} | Decision: {command_line}" if analysis else command_line
+            logger.info(f"AI: VISION → {full_analysis}")
+
             log = AILog(
                 robot_id=self.robot_id,
                 status="decision_made",
-                decision_text=decision_text
+                decision_text=full_analysis
             )
             self.add_log(log)
 
             # Parse command
-            command = self.parse_command_from_response(decision_text)
+            command = self.parse_command_from_response(command_line or decision_text)
 
             if command:
                 self.last_command_sent = command
