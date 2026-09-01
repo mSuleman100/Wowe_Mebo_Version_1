@@ -1,0 +1,4 @@
+This Application was First Deisgned For the Wowe Robot,and than we have added Mebo Robot In which we Add Claude Api COnfigurations So User can Operate the Robot From Ai. 
+In The Wowe Robot We have EspCam and Ir Sensor In Firmware Section You Will See the Code for Cam and Ir Code.
+In the Mebo You will see the Espcam code which you have to Upload on the EspCam it is same from Mebo and Wowe. the esp32_mebo_control this code you will put on the esp32. for commands.
+Check the Internet Credentials Carefully To test the Mebo and Wowe. (If In case You are unable to Send commands it will be the Ip issue.)
